@@ -51,8 +51,9 @@ permission is granted via UiAutomation since API 33 blocks notification
 posting without it), threshold detection (battery dropped below the alert
 level flips the notification to the warning title), the overlay banner
 (SYSTEM_ALERT_WINDOW), the two-tier split (warning vs critical title across
-the critical threshold, criticalThreshold clamped to alertThreshold), and
-the main activity UI.
+the critical threshold, criticalThreshold clamped to alertThreshold), the
+overlay dismiss callback (fires exactly once on auto-dismiss or tap, never
+when the overlay cannot be shown), and the main activity UI.
 
 ## Project layout
 
@@ -71,7 +72,7 @@ app/src/androidTest/kotlin/com/example/battwarn/
   MainActivityTest.kt          # main activity UI smoke test
   BatteryDropTest.kt           # threshold detection end-to-end
   CriticalThresholdTest.kt     # two-tier warning/critical split
-  OverlayAlertTest.kt          # overlay permission + banner render/hide
+  OverlayAlertTest.kt          # overlay permission + banner render/hide/dismiss callback
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
 ```
@@ -82,11 +83,16 @@ Makefile                       # command wrappers
   `ACTION_BATTERY_CHANGED` broadcast (fires on every battery change) and
   becomes ACTIVE the moment the level drops below `alert_threshold`.
 - **ACTIVE** (below alert threshold) has two tiers:
-  - **warning** (`critical <= level < alert`): banner every `poll_interval_sec`
-    (default 25s) for `toast_duration_sec` (default 5s), no sound.
-  - **critical** (below `critical_threshold`, default 5%): banner every
-    `critical_interval_sec` (default 15s) for `critical_duration_sec`
-    (default 5s) **and** plays the user-picked alert sound.
+  - **warning** (`critical <= level < alert`): banner for
+    `toast_duration_sec` (default 5s), no sound.
+  - **critical** (below `critical_threshold`, default 5%): banner for
+    `critical_duration_sec` (default 5s) **and** plays the user-picked alert
+    sound.
+  - The **next banner shows `poll_interval_sec` / `critical_interval_sec`
+    after the previous banner closed** (auto-dismiss or tap) — the interval is
+    a quiet pause between alerts. Without overlay permission there is no
+    banner, so the next cycle is scheduled interval seconds after the
+    previous one started instead.
   - Exits when the level rises back above the alert threshold or on
     `ACTION_BATTERY_OKAY`.
 - The alert is a floating banner (OverlayAlert) when the "Display over other

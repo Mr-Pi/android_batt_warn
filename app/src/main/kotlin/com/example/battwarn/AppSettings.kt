@@ -29,7 +29,7 @@ object AppSettings {
     fun alertThreshold(context: Context): Int =
         prefs(context).getInt(KEY_ALERT_THRESHOLD, DEFAULT_ALERT_THRESHOLD).coerceIn(0, 100)
 
-    /** Interval in milliseconds between toasts while below the alert level. */
+    /** Quiet pause, in milliseconds, after an alert banner closes before the next one shows. */
     fun pollIntervalMillis(context: Context): Long =
         prefs(context).getInt(KEY_POLL_INTERVAL_SEC, DEFAULT_POLL_INTERVAL_SEC)
             .coerceIn(5, 3600) * 1000L
@@ -44,7 +44,7 @@ object AppSettings {
         prefs(context).getInt(KEY_CRITICAL_THRESHOLD, DEFAULT_CRITICAL_THRESHOLD)
             .coerceIn(0, alertThreshold(context))
 
-    /** Interval in milliseconds between critical alerts while below the critical level. */
+    /** Quiet pause, in milliseconds, after a critical banner closes before the next one. */
     fun criticalIntervalMillis(context: Context): Long =
         prefs(context).getInt(KEY_CRITICAL_INTERVAL_SEC, DEFAULT_CRITICAL_INTERVAL_SEC)
             .coerceIn(5, 3600) * 1000L

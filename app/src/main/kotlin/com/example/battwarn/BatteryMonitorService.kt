@@ -32,6 +32,11 @@ import androidx.core.app.NotificationCompat
  *  - warning (critical <= level < alert): banner per warning timings.
  *  - critical (level < critical threshold): banner per critical timings and
  *    plays the configured alert sound.
+ * Each banner stays up for the tier's duration; the NEXT banner is shown
+ * interval seconds AFTER the banner closes — measured from the dismissal
+ * (auto-dismiss or tap), so the interval is a quiet pause between alerts.
+ * Without overlay permission there is no banner and thus no dismissal event;
+ * the next cycle is then scheduled interval after the previous one started.
  * The FGS notification is refreshed on every battery change (in both IDLE and
  * ACTIVE) so it always reflects the current level. Polling stops when the
  * battery rises back above the alert threshold or on ACTION_BATTERY_OKAY.
@@ -63,12 +68,6 @@ class BatteryMonitorService : Service() {
             updateNotification(level, alertThreshold, criticalThreshold)
             if (level >= 0 && level < alertThreshold) {
                 showLowBatteryAlert(level, criticalThreshold)
-                val interval = if (level < criticalThreshold) {
-                    AppSettings.criticalIntervalMillis(this@BatteryMonitorService)
-                } else {
-                    AppSettings.pollIntervalMillis(this@BatteryMonitorService)
-                }
-                handler.postDelayed(this, interval)
             } else {
                 stopPolling()
             }
@@ -92,7 +91,8 @@ class BatteryMonitorService : Service() {
     override fun onDestroy() {
         isRunning = false
         stopPolling()
-        overlayAlert?.hide()
+        overlayAlert?.hide() // may fire the dismissal callback — cancel its scheduling below
+        handler.removeCallbacksAndMessages(null)
         try {
             criticalRingtone?.stop()
         } catch (e: Exception) {
@@ -163,20 +163,43 @@ class BatteryMonitorService : Service() {
 
     private fun showLowBatteryAlert(level: Int, criticalThreshold: Int) {
         val critical = level < criticalThreshold
+        val interval = if (critical) {
+            AppSettings.criticalIntervalMillis(this)
+        } else {
+            AppSettings.pollIntervalMillis(this)
+        }
         val duration = if (critical) {
             AppSettings.criticalDurationMillis(this)
         } else {
             AppSettings.toastDurationMillis(this)
         }
-        if (Settings.canDrawOverlays(this)) {
-            val alert = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
+
+        val posted = if (Settings.canDrawOverlays(this)) {
+            val overlay = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
             val message = if (critical) {
                 getString(R.string.toast_battery_critical, level)
             } else {
                 getString(R.string.toast_battery_low, level)
             }
-            alert.show(message, duration)
+            // Interval counts from the banner closing (auto or tap). If it
+            // could not be added the callback never fires, so fall back to
+            // scheduling from show time below.
+            overlay.show(message, duration) {
+                lastBannerDismissedAtMs = android.os.SystemClock.elapsedRealtime()
+                handler.removeCallbacks(pollTask)
+                handler.postDelayed(pollTask, interval)
+            }
+        } else {
+            false
         }
+
+        if (posted) {
+            bannerShows++
+        } else {
+            handler.removeCallbacks(pollTask)
+            handler.postDelayed(pollTask, interval)
+        }
+
         if (critical) playCriticalSound()
     }
 
@@ -238,5 +261,14 @@ class BatteryMonitorService : Service() {
         /** True while this service is running (used by MainActivity on save). */
         @Volatile
         var isRunning = false
+
+        /** Change-observing counters for the alert cycle (test-facing). */
+        @Volatile
+        var bannerShows = 0L
+            private set
+
+        @Volatile
+        var lastBannerDismissedAtMs = 0L
+            private set
     }
 }

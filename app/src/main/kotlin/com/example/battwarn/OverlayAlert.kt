@@ -24,10 +24,21 @@ class OverlayAlert(context: Context) {
     private val handler = Handler(Looper.getMainLooper())
 
     private var view: View? = null
+    private var dismissedCallback: (() -> Unit)? = null
     private val dismissTask = Runnable { hide() }
 
-    /** Shows the banner for [durationMs], then removes it. Tap dismisses early. */
-    fun show(message: CharSequence, durationMs: Long) {
+    /**
+     * Shows the banner for [durationMs], then removes it. Tap dismisses early.
+     * [onDismissed] (set the next time the banner closes, whether that is the
+     * auto-dismiss or the tap) is invoked on the main looper exactly once.
+     * Returns false when the overlay could not be added (e.g. permission
+     * revoked) — no callback will fire in that case.
+     */
+    fun show(
+        message: CharSequence,
+        durationMs: Long,
+        onDismissed: (() -> Unit)? = null
+    ): Boolean {
         hide()
 
         val v = LayoutInflater.from(appContext).inflate(R.layout.overlay_banner, null)
@@ -45,26 +56,34 @@ class OverlayAlert(context: Context) {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
         }
 
-        try {
+        return try {
             windowManager.addView(v, params)
             view = v
+            dismissedCallback = onDismissed
             handler.postDelayed(dismissTask, durationMs)
+            true
         } catch (e: Exception) {
             // Overlay permission revoked or window rejected — notification is the fallback.
             view = null
+            false
         }
     }
 
     fun hide() {
         handler.removeCallbacks(dismissTask)
-        view?.let {
+        val closing = view
+        view = null
+        closing?.let {
             try {
                 windowManager.removeView(it)
             } catch (e: Exception) {
                 // Already removed.
             }
+            // Fires for the auto-dismiss or the tap, but only the closing call
+            // reaches this path, so the callback never runs twice.
+            dismissedCallback?.invoke()
+            dismissedCallback = null
         }
-        view = null
     }
 
     fun isShowing(): Boolean = view != null

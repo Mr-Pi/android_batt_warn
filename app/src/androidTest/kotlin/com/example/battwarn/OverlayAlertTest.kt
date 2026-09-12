@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -52,6 +53,40 @@ class OverlayAlertTest {
 
         instrumentation.runOnMainSync { alert.hide() }
         assertFalse("overlay should be hidden", alert.isShowing())
+    }
+
+    @Test
+    fun autoDismiss_firesCallbackExactlyOnce() {
+        grantOverlay("allow")
+        assertTrue("overlay permission not granted", Settings.canDrawOverlays(context))
+
+        var dismissCount = 0
+        val alert = OverlayAlert(context)
+        instrumentation.runOnMainSync {
+            assertTrue(alert.show("auto dismiss", 300L) { dismissCount++ })
+        }
+
+        assertTrue("callback did not fire after auto-dismiss", await(5_000) { dismissCount == 1 })
+        assertFalse("overlay should be gone", alert.isShowing())
+
+        // A second hide() must not fire the callback again.
+        instrumentation.runOnMainSync { alert.hide() }
+        Thread.sleep(500)
+        assertEquals("callback fired more than once", 1, dismissCount)
+    }
+
+    @Test
+    fun showFails_withoutOverlayPermission_noCallback() {
+        grantOverlay("deny")
+
+        var dismissed = false
+        val alert = OverlayAlert(context)
+        instrumentation.runOnMainSync {
+            val shown = alert.show("no permission", 300L) { dismissed = true }
+            assertFalse("overlay must not render without permission", shown)
+        }
+        assertFalse("overlay should not be showing", alert.isShowing())
+        assertFalse("callback must not run", dismissed)
     }
 
     /**
