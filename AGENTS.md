@@ -70,14 +70,17 @@ Makefile                       # command wrappers
 
 ## Behavior
 
-- **IDLE** (battery >= alert threshold): zero polling; waits on the system
-  `ACTION_BATTERY_LOW` broadcast (~15%, device dependent).
+- **IDLE** (battery >= alert threshold): zero polling. Listens for the system
+  `ACTION_BATTERY_CHANGED` broadcast (fires on every battery change) and
+  becomes ACTIVE the moment the level drops below `alert_threshold`.
 - **ACTIVE** (below alert threshold): polls every `poll_interval_sec`
   (default 25s), shows a toast for `toast_duration_sec` (default 5s) each
   cycle. Exits when the level rises back above the alert threshold or on
   `ACTION_BATTERY_OKAY`.
-- The foreground-service notification text is a fallback surface, since
-  toasts are blocked in the background on Android 10+ and entirely on 12+.
+- The foreground-service notification is refreshed on every battery change
+  (in both IDLE and ACTIVE) so it always shows the current level. It doubles
+  as the alert surface since toasts are blocked in the background on Android
+  10+ and entirely on 12+.
 
 ## Configuration & conventions
 

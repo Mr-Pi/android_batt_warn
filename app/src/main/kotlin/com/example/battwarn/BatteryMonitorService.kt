@@ -19,15 +19,17 @@ import androidx.core.app.NotificationCompat
 /**
  * Battery-respecting foreground service.
  *
- * IDLE mode (battery >= alert threshold): no polling at all. We wait for the
- * system's ACTION_BATTERY_LOW broadcast (fired ~15%, device dependent) or for
- * the service to start while the level is already below the alert threshold.
+ * IDLE mode (battery >= alert threshold): no polling at all. We listen for the
+ * system's ACTION_BATTERY_CHANGED broadcast (fired on every battery change)
+ * and check the level on start; the service becomes ACTIVE the moment the
+ * level drops below the alert threshold.
  *
  * ACTIVE mode (battery below the alert threshold): poll every configured
- * interval and show a toast. The FGS notification text is updated as a
- * fallback in case toasts are blocked in the background (Android 10+
- * restriction). Polling stops when the battery rises back above the alert
- * threshold or on ACTION_BATTERY_OKAY.
+ * interval and show a toast. The FGS notification is refreshed on every
+ * battery change (in both IDLE and ACTIVE) so it always reflects the current
+ * level — a fallback surface since toasts are blocked in the background
+ * (Android 10+ restriction). Polling stops when the battery rises back above
+ * the alert threshold or on ACTION_BATTERY_OKAY.
  *
  * All thresholds/timings are read from SharedPreferences (see [AppSettings]).
  */
@@ -41,6 +43,7 @@ class BatteryMonitorService : Service() {
             when (intent?.action) {
                 Intent.ACTION_BATTERY_LOW -> startPolling()
                 Intent.ACTION_BATTERY_OKAY -> stopPolling()
+                Intent.ACTION_BATTERY_CHANGED -> onBatteryChanged(intent)
             }
         }
     }
@@ -103,6 +106,7 @@ class BatteryMonitorService : Service() {
 
     private fun registerBatteryActions() {
         val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(Intent.ACTION_BATTERY_LOW)
             addAction(Intent.ACTION_BATTERY_OKAY)
         }
@@ -114,6 +118,14 @@ class BatteryMonitorService : Service() {
         }
     }
 
+    /** Reacts to every battery change: refresh the notification and cross into ACTIVE if low. */
+    private fun onBatteryChanged(intent: Intent?) {
+        val level = levelFrom(intent)
+        val threshold = AppSettings.alertThreshold(this)
+        updateNotification(level, threshold)
+        if (level >= 0 && level < threshold) startPolling() else stopPolling()
+    }
+
     private fun currentBatteryLevel(): Int {
         // Sticky system broadcast — no BatteryManager permission needed.
         val sticky = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -122,9 +134,13 @@ class BatteryMonitorService : Service() {
             @Suppress("DEPRECATION")
             registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         }
-        val level = sticky?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = sticky?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-        return if (level > 0 && scale > 0) (level * 100) / scale else -1
+        return levelFrom(sticky)
+    }
+
+    private fun levelFrom(intent: Intent?): Int {
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return if (level >= 0 && scale > 0) (level * 100) / scale else -1
     }
 
     private fun showLowBatteryToast(level: Int) {
