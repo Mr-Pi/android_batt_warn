@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
@@ -34,6 +35,20 @@ class MainActivity : AppCompatActivity() {
             // Result irrelevant; the system settings screen shows the toggle.
         }
 
+    private val soundPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            }
+            AppSettings.prefs(this).edit()
+                .putString(AppSettings.KEY_CRITICAL_SOUND_URI, uri?.toString() ?: "")
+                .apply()
+            updateSoundLabel()
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -42,6 +57,7 @@ class MainActivity : AppCompatActivity() {
         binding.startButton.setOnClickListener { startMonitoring() }
         binding.stopButton.setOnClickListener { stopMonitoring() }
         binding.saveButton.setOnClickListener { saveSettings() }
+        binding.pickSoundButton.setOnClickListener { pickSound() }
 
         requestNotificationPermissionIfNeeded()
         loadSettingsIntoFields()
@@ -63,23 +79,83 @@ class MainActivity : AppCompatActivity() {
         binding.alertField.setText(AppSettings.alertThreshold(this).toString())
         binding.intervalField.setText((AppSettings.pollIntervalMillis(this) / 1000L).toString())
         binding.durationField.setText((AppSettings.toastDurationMillis(this) / 1000L).toString())
+        binding.criticalField.setText(AppSettings.criticalThreshold(this).toString())
+        binding.criticalIntervalField.setText((AppSettings.criticalIntervalMillis(this) / 1000L).toString())
+        binding.criticalDurationField.setText((AppSettings.criticalDurationMillis(this) / 1000L).toString())
+        updateSoundLabel()
+    }
+
+    private fun updateSoundLabel() {
+        val uriText = AppSettings.criticalSoundUri(this)
+        binding.soundValue.text = if (uriText.isEmpty()) {
+            getString(R.string.sound_silent)
+        } else {
+            try {
+                RingtoneManager.getRingtone(this, Uri.parse(uriText))?.getTitle(this)
+                    ?: getString(R.string.sound_silent)
+            } catch (e: Exception) {
+                getString(R.string.sound_silent)
+            }
+        }
+    }
+
+    private fun pickSound() {
+        val current = AppSettings.criticalSoundUri(this)
+        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, getString(R.string.label_sound))
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+            putExtra(
+                RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                if (current.isEmpty()) {
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                } else {
+                    Uri.parse(current)
+                }
+            )
+        }
+        soundPickerLauncher.launch(intent)
     }
 
     private fun saveSettings() {
         val alert = binding.alertField.text.toString().toIntOrNull()
         val intervalSec = binding.intervalField.text.toString().toIntOrNull()
         val durationSec = binding.durationField.text.toString().toIntOrNull()
+        val critical = binding.criticalField.text.toString().toIntOrNull()
+        val criticalIntervalSec = binding.criticalIntervalField.text.toString().toIntOrNull()
+        val criticalDurationSec = binding.criticalDurationField.text.toString().toIntOrNull()
 
         var valid = true
 
         val alertValid = alert != null && alert in 0..100
         val intervalValid = intervalSec != null && intervalSec in 5..3600
         val durationValid = durationSec != null && durationSec in 1..30
+        val criticalValid = critical != null && critical in 0..100
+        val criticalIntervalValid = criticalIntervalSec != null && criticalIntervalSec in 5..3600
+        val criticalDurationValid = criticalDurationSec != null && criticalDurationSec in 1..30
+        val criticalLeAlert = critical != null && alert != null && critical <= alert
 
         binding.alertField.error = if (alertValid) null else getString(R.string.error_alert)
         binding.intervalField.error = if (intervalValid) null else getString(R.string.error_interval)
         binding.durationField.error = if (durationValid) null else getString(R.string.error_duration)
-        valid = alertValid && intervalValid && durationValid
+        binding.criticalField.error = when {
+            !criticalValid -> getString(R.string.error_alert)
+            !criticalLeAlert -> getString(R.string.error_critical_le_alert)
+            else -> null
+        }
+        binding.criticalIntervalField.error = if (criticalIntervalValid) {
+            null
+        } else {
+            getString(R.string.error_interval)
+        }
+        binding.criticalDurationField.error = if (criticalDurationValid) {
+            null
+        } else {
+            getString(R.string.error_duration)
+        }
+        valid = alertValid && intervalValid && durationValid &&
+            criticalValid && criticalIntervalValid && criticalDurationValid && criticalLeAlert
 
         if (!valid) return
 
@@ -87,6 +163,9 @@ class MainActivity : AppCompatActivity() {
             .putInt(AppSettings.KEY_ALERT_THRESHOLD, alert!!)
             .putInt(AppSettings.KEY_POLL_INTERVAL_SEC, intervalSec!!)
             .putInt(AppSettings.KEY_TOAST_DURATION_SEC, durationSec!!)
+            .putInt(AppSettings.KEY_CRITICAL_THRESHOLD, critical!!)
+            .putInt(AppSettings.KEY_CRITICAL_INTERVAL_SEC, criticalIntervalSec!!)
+            .putInt(AppSettings.KEY_CRITICAL_DURATION_SEC, criticalDurationSec!!)
             .apply()
 
         // Restart so the running service applies the new values immediately.

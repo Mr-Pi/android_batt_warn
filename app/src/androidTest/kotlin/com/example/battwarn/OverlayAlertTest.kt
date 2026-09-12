@@ -2,6 +2,7 @@ package com.example.battwarn
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -64,9 +65,29 @@ class OverlayAlertTest {
         if (opPackage != context.packageName) {
             shell("appops set $opPackage SYSTEM_ALERT_WINDOW $mode")
         }
+        if (mode == "allow") {
+            // appops applies asynchronously; wait for it to land.
+            await(5_000) { Settings.canDrawOverlays(context) }
+        }
     }
 
+    /** Runs a shell command and waits for it to finish (drains the output). */
     private fun shell(cmd: String) {
-        instrumentation.uiAutomation.executeShellCommand(cmd).close()
+        val fd = instrumentation.uiAutomation.executeShellCommand(cmd)
+        ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
+            val buffer = ByteArray(4096)
+            while (input.read(buffer) != -1) {
+                // Drain until the command completes.
+            }
+        }
+    }
+
+    private fun await(timeoutMs: Long, condition: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return true
+            Thread.sleep(200)
+        }
+        return condition()
     }
 }

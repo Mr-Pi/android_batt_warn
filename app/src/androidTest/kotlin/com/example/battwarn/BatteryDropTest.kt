@@ -19,8 +19,8 @@ import org.junit.runner.RunWith
 /**
  * End-to-end regression test for threshold detection: when the battery drops
  * below the configured alert level, the service must enter ACTIVE mode and
- * the notification must switch to the "CRITICALLY LOW" title showing the
- * current level.
+ * the notification must switch to the warning title ("Battery low") showing
+ * the current level — still above the critical threshold, so no sound.
  */
 @RunWith(AndroidJUnit4::class)
 class BatteryDropTest {
@@ -35,10 +35,11 @@ class BatteryDropTest {
     }
 
     @Test
-    fun batteryDropBelowThreshold_flipsNotificationToCritical() {
+    fun batteryDropBelowAlertThreshold_showsWarningTitle() {
         grantNotificationPermission()
 
-        // High threshold so the emulator's default 100% starts in IDLE.
+        // High alert threshold so the emulator's default 100% starts in IDLE.
+        // Critical stays at its default (5) — this tests the warning tier.
         AppSettings.prefs(context).edit()
             .putInt(AppSettings.KEY_ALERT_THRESHOLD, 90)
             .commit()
@@ -50,18 +51,18 @@ class BatteryDropTest {
             )
             assertTrue("service did not start", await(10_000) { BatteryMonitorService.isRunning })
 
-            // Drop the battery below the threshold.
+            // Drop the battery below the alert threshold (but above critical).
             shell("dumpsys battery set level 50")
 
             val nm = context.getSystemService(NotificationManager::class.java)
-            val criticalTitle = context.getString(R.string.notif_title_critical)
+            val warningTitle = context.getString(R.string.notif_title_warning)
 
             assertTrue(
-                "notification did not become critical",
+                "notification did not show the warning title",
                 await(10_000) {
                     nm.activeNotifications.any {
                         it.notification.extras
-                            .getCharSequence(Notification.EXTRA_TITLE)?.toString() == criticalTitle
+                            .getCharSequence(Notification.EXTRA_TITLE)?.toString() == warningTitle
                     }
                 }
             )

@@ -8,6 +8,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -24,13 +28,13 @@ import androidx.core.app.NotificationCompat
  * and check the level on start; the service becomes ACTIVE the moment the
  * level drops below the alert threshold.
  *
- * ACTIVE mode (battery below the alert threshold): poll every configured
- * interval and show an alert. The FGS notification is refreshed on every
- * battery change (in both IDLE and ACTIVE) so it always reflects the current
- * level. When the "Display over other apps" permission is granted the alert
- * is a floating banner (visible even in the background); otherwise the
- * notification is the fallback surface. Polling stops when the battery rises
- * back above the alert threshold or on ACTION_BATTERY_OKAY.
+ * ACTIVE mode (battery below the alert threshold) has two tiers:
+ *  - warning (critical <= level < alert): banner per warning timings.
+ *  - critical (level < critical threshold): banner per critical timings and
+ *    plays the configured alert sound.
+ * The FGS notification is refreshed on every battery change (in both IDLE and
+ * ACTIVE) so it always reflects the current level. Polling stops when the
+ * battery rises back above the alert threshold or on ACTION_BATTERY_OKAY.
  *
  * All thresholds/timings are read from SharedPreferences (see [AppSettings]).
  */
@@ -39,6 +43,7 @@ class BatteryMonitorService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var polling = false
     private var overlayAlert: OverlayAlert? = null
+    private var criticalRingtone: Ringtone? = null
 
     private val batteryActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -53,14 +58,17 @@ class BatteryMonitorService : Service() {
     private val pollTask = object : Runnable {
         override fun run() {
             val level = currentBatteryLevel()
-            val threshold = AppSettings.alertThreshold(this@BatteryMonitorService)
-            updateNotification(level, threshold)
-            if (level >= 0 && level < threshold) {
-                showLowBatteryAlert(level)
-                handler.postDelayed(
-                    this,
+            val alertThreshold = AppSettings.alertThreshold(this@BatteryMonitorService)
+            val criticalThreshold = AppSettings.criticalThreshold(this@BatteryMonitorService)
+            updateNotification(level, alertThreshold, criticalThreshold)
+            if (level >= 0 && level < alertThreshold) {
+                showLowBatteryAlert(level, criticalThreshold)
+                val interval = if (level < criticalThreshold) {
+                    AppSettings.criticalIntervalMillis(this@BatteryMonitorService)
+                } else {
                     AppSettings.pollIntervalMillis(this@BatteryMonitorService)
-                )
+                }
+                handler.postDelayed(this, interval)
             } else {
                 stopPolling()
             }
@@ -70,8 +78,9 @@ class BatteryMonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createNotificationChannel()
         val threshold = AppSettings.alertThreshold(this)
+        val criticalThreshold = AppSettings.criticalThreshold(this)
         val level = currentBatteryLevel()
-        startForeground(NOTIFICATION_ID, buildNotification(level, threshold))
+        startForeground(NOTIFICATION_ID, buildNotification(level, threshold, criticalThreshold))
         registerBatteryActions()
         if (level in 0 until threshold) {
             startPolling()
@@ -84,6 +93,11 @@ class BatteryMonitorService : Service() {
         isRunning = false
         stopPolling()
         overlayAlert?.hide()
+        try {
+            criticalRingtone?.stop()
+        } catch (e: Exception) {
+            // Already stopped or invalid.
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             unregisterReceiver(batteryActionReceiver)
         } else {
@@ -124,9 +138,10 @@ class BatteryMonitorService : Service() {
     /** Reacts to every battery change: refresh the notification and cross into ACTIVE if low. */
     private fun onBatteryChanged(intent: Intent?) {
         val level = levelFrom(intent)
-        val threshold = AppSettings.alertThreshold(this)
-        updateNotification(level, threshold)
-        if (level >= 0 && level < threshold) startPolling() else stopPolling()
+        val alertThreshold = AppSettings.alertThreshold(this)
+        val criticalThreshold = AppSettings.criticalThreshold(this)
+        updateNotification(level, alertThreshold, criticalThreshold)
+        if (level >= 0 && level < alertThreshold) startPolling() else stopPolling()
     }
 
     private fun currentBatteryLevel(): Int {
@@ -146,13 +161,39 @@ class BatteryMonitorService : Service() {
         return if (level >= 0 && scale > 0) (level * 100) / scale else -1
     }
 
-    private fun showLowBatteryAlert(level: Int) {
-        if (!Settings.canDrawOverlays(this)) return // notification is the fallback
-        val alert = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
-        alert.show(
-            getString(R.string.toast_battery_critical, level),
+    private fun showLowBatteryAlert(level: Int, criticalThreshold: Int) {
+        val critical = level < criticalThreshold
+        val duration = if (critical) {
+            AppSettings.criticalDurationMillis(this)
+        } else {
             AppSettings.toastDurationMillis(this)
-        )
+        }
+        if (Settings.canDrawOverlays(this)) {
+            val alert = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
+            val message = if (critical) {
+                getString(R.string.toast_battery_critical, level)
+            } else {
+                getString(R.string.toast_battery_low, level)
+            }
+            alert.show(message, duration)
+        }
+        if (critical) playCriticalSound()
+    }
+
+    /** Plays the user-picked notification sound; silent pick or muted ringer means no sound. */
+    private fun playCriticalSound() {
+        val uriText = AppSettings.criticalSoundUri(this)
+        if (uriText.isEmpty()) return
+        val ringer = getSystemService(AudioManager::class.java).ringerMode
+        if (ringer != AudioManager.RINGER_MODE_NORMAL) return
+        try {
+            val ringtone = RingtoneManager.getRingtone(this, Uri.parse(uriText))
+            criticalRingtone?.stop()
+            ringtone?.play()
+            criticalRingtone = ringtone
+        } catch (e: Exception) {
+            // Invalid or unplayable URI — the banner and notification still inform the user.
+        }
     }
 
     private fun createNotificationChannel() {
@@ -164,12 +205,11 @@ class BatteryMonitorService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private fun buildNotification(level: Int, threshold: Int): Notification {
-        val critical = level >= 0 && level < threshold
-        val title = if (critical) {
-            getString(R.string.notif_title_critical)
-        } else {
-            getString(R.string.notif_title_monitoring)
+    private fun buildNotification(level: Int, alertThreshold: Int, criticalThreshold: Int): Notification {
+        val title = when {
+            level >= 0 && level < criticalThreshold -> getString(R.string.notif_title_critical)
+            level >= 0 && level < alertThreshold -> getString(R.string.notif_title_warning)
+            else -> getString(R.string.notif_title_monitoring)
         }
         val text = if (level >= 0) {
             getString(R.string.notif_text_level, level)
@@ -186,9 +226,9 @@ class BatteryMonitorService : Service() {
             .build()
     }
 
-    private fun updateNotification(level: Int, threshold: Int) {
+    private fun updateNotification(level: Int, alertThreshold: Int, criticalThreshold: Int) {
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildNotification(level, threshold))
+            .notify(NOTIFICATION_ID, buildNotification(level, alertThreshold, criticalThreshold))
     }
 
     companion object {

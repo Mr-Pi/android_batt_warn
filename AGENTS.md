@@ -49,8 +49,10 @@ BOOT_COMPLETED / MY_PACKAGE_REPLACED and starts the FGS), the FGS lifecycle
 (isRunning + startForeground notification; the runtime POST_NOTIFICATIONS
 permission is granted via UiAutomation since API 33 blocks notification
 posting without it), threshold detection (battery dropped below the alert
-level flips the notification to critical), the overlay banner (SYSTEM_ALERT_WINDOW),
-and the main activity UI.
+level flips the notification to the warning title), the overlay banner
+(SYSTEM_ALERT_WINDOW), the two-tier split (warning vs critical title across
+the critical threshold, criticalThreshold clamped to alertThreshold), and
+the main activity UI.
 
 ## Project layout
 
@@ -68,6 +70,7 @@ app/src/androidTest/kotlin/com/example/battwarn/
   ServiceSmokeTest.kt          # FGS lifecycle + notification
   MainActivityTest.kt          # main activity UI smoke test
   BatteryDropTest.kt           # threshold detection end-to-end
+  CriticalThresholdTest.kt     # two-tier warning/critical split
   OverlayAlertTest.kt          # overlay permission + banner render/hide
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
@@ -78,24 +81,32 @@ Makefile                       # command wrappers
 - **IDLE** (battery >= alert threshold): zero polling. Listens for the system
   `ACTION_BATTERY_CHANGED` broadcast (fires on every battery change) and
   becomes ACTIVE the moment the level drops below `alert_threshold`.
-- **ACTIVE** (below alert threshold): polls every `poll_interval_sec`
-  (default 25s), shows an alert for `toast_duration_sec` (default 5s) each
-  cycle. Exits when the level rises back above the alert threshold or on
-  `ACTION_BATTERY_OKAY`.
+- **ACTIVE** (below alert threshold) has two tiers:
+  - **warning** (`critical <= level < alert`): banner every `poll_interval_sec`
+    (default 25s) for `toast_duration_sec` (default 5s), no sound.
+  - **critical** (below `critical_threshold`, default 5%): banner every
+    `critical_interval_sec` (default 15s) for `critical_duration_sec`
+    (default 5s) **and** plays the user-picked alert sound.
+  - Exits when the level rises back above the alert threshold or on
+    `ACTION_BATTERY_OKAY`.
 - The alert is a floating banner (OverlayAlert) when the "Display over other
   apps" permission (SYSTEM_ALERT_WINDOW) is granted — visible even in the
   background. Without it, the notification is the fallback.
 - The foreground-service notification is refreshed on every battery change
-  (in both IDLE and ACTIVE) so it always shows the current level. It doubles
-  as the alert surface when the overlay permission isn't granted (toasts are
-  unreliable from the background on Android 10+ and entirely on 12+).
+  (in both IDLE and ACTIVE) so it always shows the current level. Its title
+  flips monitoring → warning → critical as the level crosses the thresholds.
+  It doubles as the alert surface when the overlay permission isn't granted
+  (toasts are unreliable from the background on Android 10+ and entirely on 12+).
 
 ## Configuration & conventions
 
 - Settings live in `AppSettings` (SharedPreferences `battwarn_settings`):
-  `alert_threshold`, `poll_interval_sec`, `toast_duration_sec`. Validation
-  ranges: threshold 0-100, interval 5-3600s, duration 1-30s. The service
-  reads prefs fresh each poll, so saved values apply immediately.
+  warning tier `alert_threshold`, `poll_interval_sec`, `toast_duration_sec`;
+  critical tier `critical_threshold`, `critical_interval_sec`,
+  `critical_duration_sec` plus `critical_sound_uri` (empty = silent).
+  Validation ranges: thresholds 0-100 (critical ≤ alert), intervals 5-3600s,
+  durations 1-30s. The service reads prefs fresh each poll, so saved values
+  apply immediately.
 - `viewBinding` is enabled; use it in new layouts.
 - Keep minSdk 28 / targetSdk 35 / compileSdk 35.
 - Use Kotlin, short names, happy-path alignment, wrap errors with context.

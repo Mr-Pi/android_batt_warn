@@ -9,8 +9,10 @@
     <string name="status_running">Monitoring battery — alert below %1$d%%</string>
     <string name="status_saved">Settings saved — alert below %1$d%%</string>
     <string name="toast_battery_critical">Battery critically low: %1$d%%</string>
+    <string name="toast_battery_low">Battery low: %1$d%%</string>
     <string name="channel_name">Battery monitor</string>
     <string name="notif_title_monitoring">Battery monitor active</string>
+    <string name="notif_title_warning">Battery low</string>
     <string name="notif_title_critical">BATTERY CRITICALLY LOW</string>
     <string name="notif_text_level">Battery at %1$d%%</string>
     <string name="notif_text_unknown">Battery level unknown</string>
@@ -28,4 +30,19 @@
     <string name="error_alert">Enter a value between 0 and 100</string>
     <string name="error_interval">Enter a value between 5 and 3600</string>
     <string name="error_duration">Enter a value between 1 and 30</string>
+    <string name="error_critical_le_alert">Must be at or below the alert threshold</string>
+
+    <!-- Critical section -->
+    <string name="warning_title">Warning</string>
+    <string name="critical_title">Critical</string>
+    <string name="label_critical">Critical below (%)</string>
+    <string name="desc_critical">Below this lower level, alerts use critical timings and play the alert sound.</string>
+    <string name="label_critical_interval">Critical interval (seconds)</string>
+    <string name="desc_critical_interval">Seconds between each critical alert.</string>
+    <string name="label_critical_duration">Critical duration (seconds)</string>
+    <string name="desc_critical_duration">How many seconds each critical alert banner stays on screen.</string>
+    <string name="label_sound">Alert sound</string>
+    <string name="desc_sound">Played with each critical alert. Used when the battery is below the critical level.</string>
+    <string name="sound_silent">Silent</string>
+    <string name="pick_sound">Pick sound</string>
 </resources>

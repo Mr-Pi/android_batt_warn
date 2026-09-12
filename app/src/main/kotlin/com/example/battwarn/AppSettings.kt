@@ -9,10 +9,18 @@ object AppSettings {
     const val KEY_ALERT_THRESHOLD = "alert_threshold"
     const val KEY_POLL_INTERVAL_SEC = "poll_interval_sec"
     const val KEY_TOAST_DURATION_SEC = "toast_duration_sec"
+    const val KEY_CRITICAL_THRESHOLD = "critical_threshold"
+    const val KEY_CRITICAL_INTERVAL_SEC = "critical_interval_sec"
+    const val KEY_CRITICAL_DURATION_SEC = "critical_duration_sec"
+    const val KEY_CRITICAL_SOUND_URI = "critical_sound_uri"
 
     const val DEFAULT_ALERT_THRESHOLD = 10
     const val DEFAULT_POLL_INTERVAL_SEC = 25
     const val DEFAULT_TOAST_DURATION_SEC = 5
+    const val DEFAULT_CRITICAL_THRESHOLD = 5
+    const val DEFAULT_CRITICAL_INTERVAL_SEC = 15
+    const val DEFAULT_CRITICAL_DURATION_SEC = 5
+    const val DEFAULT_CRITICAL_SOUND_URI = ""
 
     fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -30,4 +38,23 @@ object AppSettings {
     fun toastDurationMillis(context: Context): Long =
         prefs(context).getInt(KEY_TOAST_DURATION_SEC, DEFAULT_TOAST_DURATION_SEC)
             .coerceIn(1, 30) * 1000L
+
+    /** Critical level in percent — always at or below the alert threshold. */
+    fun criticalThreshold(context: Context): Int =
+        prefs(context).getInt(KEY_CRITICAL_THRESHOLD, DEFAULT_CRITICAL_THRESHOLD)
+            .coerceIn(0, alertThreshold(context))
+
+    /** Interval in milliseconds between critical alerts while below the critical level. */
+    fun criticalIntervalMillis(context: Context): Long =
+        prefs(context).getInt(KEY_CRITICAL_INTERVAL_SEC, DEFAULT_CRITICAL_INTERVAL_SEC)
+            .coerceIn(5, 3600) * 1000L
+
+    /** How long each critical alert banner stays on screen, in milliseconds. */
+    fun criticalDurationMillis(context: Context): Long =
+        prefs(context).getInt(KEY_CRITICAL_DURATION_SEC, DEFAULT_CRITICAL_DURATION_SEC)
+            .coerceIn(1, 30) * 1000L
+
+    /** Ringtone URI string for the critical alert sound (empty = silent). */
+    fun criticalSoundUri(context: Context): String =
+        prefs(context).getString(KEY_CRITICAL_SOUND_URI, DEFAULT_CRITICAL_SOUND_URI) ?: ""
 }
