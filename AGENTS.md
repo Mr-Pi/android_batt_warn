@@ -13,8 +13,9 @@ Everything is provided by nix:
 nix-shell          # enter the dev environment (regenerates local.properties)
 ```
 
-The shell provides Gradle 8.14.4, JDK 17, the Android SDK (platforms 28-35,
-build-tools, platform-tools, NDK r27, CMake). On NixOS the shell also exports
+The shell provides Gradle 8.14.4, JDK 17, the Android SDK (platform 35,
+build-tools, platform-tools, NDK r27, CMake, the API 35 AVD system image,
+and the emulator). On NixOS the shell also exports
 `ORG_GRADLE_PROJECT_android.aapt2FromMavenOverride` so AGP uses the
 nix-built aapt2 instead of the non-NixOS-safe Maven binary.
 
@@ -29,15 +30,25 @@ make install      # build + adb install to connected device
 make run          # install + start MainActivity
 make clean        # gradle clean
 make devices      # adb devices
+make emulator     # boot headless API 35 emulator (AVD "test") if not running
+make test         # gradle connectedDebugAndroidTest on the running emulator
+make test-boot    # boot emulator (waits for boot) then run instrumented tests
 ```
 
 Direct Gradle options:
 
 ```
-gradle assembleDebug      # build debug APK
-gradle lintDebug          # Android Lint
-gradle test               # unit tests (none currently)
+gradle assembleDebug            # build debug APK
+gradle lintDebug                # Android Lint
+gradle testUnitTest             # JVM unit tests (none currently)
+gradle connectedDebugAndroidTest  # instrumented tests (emulator must be up)
 ```
+
+Instrumented tests cover the autostart contract (BootReceiver resolves for
+BOOT_COMPLETED / MY_PACKAGE_REPLACED and starts the FGS), the FGS lifecycle
+(isRunning + startForeground notification; the runtime POST_NOTIFICATIONS
+permission is granted via UiAutomation since API 33 blocks notification
+posting without it), and the main activity UI.
 
 ## Project layout
 
@@ -49,7 +60,11 @@ app/src/main/kotlin/com/example/battwarn/
   AppSettings.kt               # config settings (SharedPreferences) + defaults
 app/src/main/AndroidManifest.xml
 app/src/main/res/              # layout, strings, colors, theme, icons
-shell.nix                      # nix dev env (JDK, Gradle, Android SDK)
+app/src/androidTest/kotlin/com/example/battwarn/
+  BootReceiverTest.kt          # autostart contract (manifest + receiver behavior)
+  ServiceSmokeTest.kt          # FGS lifecycle + notification
+  MainActivityTest.kt          # main activity UI smoke test
+shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
 ```
 
@@ -78,3 +93,4 @@ Makefile                       # command wrappers
 
 1. `make build` — the debug APK must build.
 2. `gradle lintDebug` — no new fatal lint issues.
+3. If the app behavior changed, run `make test` (emulator + instrumented tests).

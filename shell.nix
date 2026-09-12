@@ -19,13 +19,14 @@ let
       cmake               = "3.22.1";
     };
 
-    # API 28 = Android 9, up to API 35 = Android 15
-    platforms = [
-      "28" "29" "30" "31" "32" "33" "34" "35"
-    ];
+    # API 35 = Android 15. Only the compileSdk platform is needed; the app
+    # targets minSdk 28 via AGP which doesn't require older SDK platforms.
+    # Keeping this small also limits system-image downloads to one image.
+    platforms = [ "35" ];
 
-    # Real device ABIs only (no x86 — emulator is excluded)
-    abis = [ "arm64-v8a" "armeabi-v7a" ];
+    # x86_64 only: needed for the emulator on an x86_64 host. Real-device ABIs
+    # don't need SDK components beyond the NDK/build-tools, which are separate.
+    abis = [ "x86_64" ];
   };
 
   androidEnv = pkgs.callPackage <nixpkgs/pkgs/development/mobile/androidenv> {
@@ -40,8 +41,12 @@ let
     abiVersions          = android.abis;
 
     includeSources       = true;
-    includeSystemImages  = false;
-    includeEmulator      = false;
+    includeSystemImages  = true;
+    includeEmulator      = true;
+
+    # Google APIs Play Store image for the emulator (API 35 = Android 15).
+    # System image versions follow platformVersions ("35").
+    systemImageTypes     = [ "google_apis_playstore" ];
 
     includeNDK           = true;
     ndkVersions          = android.versions.ndk;
