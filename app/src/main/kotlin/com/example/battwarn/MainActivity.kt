@@ -1,6 +1,8 @@
 package com.example.battwarn
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -73,12 +75,36 @@ class MainActivity : AppCompatActivity() {
 
         requestNotificationPermissionIfNeeded()
         loadSettingsIntoFields()
+        refreshBattery()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Sticky broadcast: registering delivers the current level at once and
+        // every change afterwards keeps the big % live while we are visible.
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(batteryReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(batteryReceiver, filter)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unregisterReceiver(batteryReceiver)
     }
 
     override fun onResume() {
         super.onResume()
-        refreshBattery()
         refreshMonitorControls()
+    }
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            renderLevel(levelFrom(intent))
+        }
     }
 
     private fun refreshMonitorControls() {
@@ -217,20 +243,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshBattery() {
-        val sticky = stickyBattery()
-        val level = sticky?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = sticky?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-        val percent = if (level >= 0 && scale > 0) (level * 100) / scale else -1
-        if (percent >= 0) {
-            binding.batteryText.text = getString(R.string.battery_format, percent)
-            binding.batteryText.setTextColor(
-                ContextCompat.getColor(
-                    this,
-                    if (percent < AppSettings.alertThreshold(this)) R.color.battery_red
-                    else R.color.battery_green
-                )
+        renderLevel(levelFrom(stickyBattery()))
+    }
+
+    private fun renderLevel(percent: Int) {
+        if (percent < 0) return
+        binding.batteryText.text = getString(R.string.battery_format, percent)
+        binding.batteryText.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (percent < AppSettings.alertThreshold(this)) R.color.battery_red
+                else R.color.battery_green
             )
-        }
+        )
+    }
+
+    private fun levelFrom(intent: Intent?): Int {
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return if (level >= 0 && scale > 0) (level * 100) / scale else -1
     }
 
     private fun startMonitoring() {

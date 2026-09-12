@@ -1,11 +1,13 @@
 package com.example.battwarn
 
 import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.widget.Button
 import android.widget.TextView
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,11 +16,20 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Launches the main activity and checks the battery UI is populated and the
- * single Start/Stop toggle reflects the service state.
+ * Launches the main activity and checks the battery UI is populated, the
+ * single Start/Stop toggle reflects the service state, the level updates
+ * live while visible, and the alert sound can be silenced.
  */
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
+
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    @After
+    fun tearDown() {
+        shell("dumpsys battery reset")
+        AppSettings.prefs(context).edit().clear().commit()
+    }
 
     @Test
     fun launch_showsBatteryLevelAndToggle() {
@@ -43,8 +54,20 @@ class MainActivityTest {
     }
 
     @Test
+    fun batteryLevelUpdatesLive() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            // Lowering the battery emits the real ACTION_BATTERY_CHANGED
+            // broadcast; the visible activity must pick it up live.
+            shell("dumpsys battery set level 42")
+
+            assertTrue("battery text did not update live", await(10_000) {
+                textOf(scenario, R.id.battery_text) == "42%"
+            })
+        }
+    }
+
+    @Test
     fun removeSound_clearsUriAndShowsSilent() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
         AppSettings.prefs(context).edit()
             .putString(
                 AppSettings.KEY_CRITICAL_SOUND_URI,
@@ -65,18 +88,38 @@ class MainActivityTest {
                     "",
                     AppSettings.criticalSoundUri(context)
                 )
-                assertEquals(
-                    activity.getString(R.string.sound_silent),
-                    value.text.toString()
-                )
+                assertEquals(activity.getString(R.string.sound_silent), value.text.toString())
                 assertFalse("remove must disable itself once silent", remove.isEnabled)
             }
         }
     }
 
-    @After
-    fun tearDown() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        AppSettings.prefs(context).edit().clear().commit()
+    private fun textOf(scenario: ActivityScenario<MainActivity>, viewId: Int): String? {
+        var text: String? = null
+        scenario.onActivity { activity ->
+            text = activity.findViewById<TextView>(viewId).text.toString()
+        }
+        return text
+    }
+
+    /** Runs a shell command and waits for it to finish (drains the output). */
+    private fun shell(cmd: String) {
+        val fd = InstrumentationRegistry.getInstrumentation().uiAutomation
+            .executeShellCommand(cmd)
+        ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
+            val buffer = ByteArray(4096)
+            while (input.read(buffer) != -1) {
+                // Drain until the command completes.
+            }
+        }
+    }
+
+    private fun await(timeoutMs: Long, condition: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return true
+            Thread.sleep(200)
+        }
+        return condition()
     }
 }

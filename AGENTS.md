@@ -101,6 +101,8 @@ Makefile                       # command wrappers
 - The alert is a floating banner (OverlayAlert) when the "Display over other
   apps" permission (SYSTEM_ALERT_WINDOW) is granted — visible even in the
   background. Without it, the notification is the fallback.
+- The main screen shows the live battery level: the activity registers for
+  `ACTION_BATTERY_CHANGED` while visible and re-renders on every change.
 - The foreground-service notification is refreshed on every battery change
   (in both IDLE and ACTIVE) so it always shows the current level. Its title
   flips monitoring → warning → critical as the level crosses the thresholds.
