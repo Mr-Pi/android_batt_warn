@@ -231,10 +231,18 @@
                 android:textSize="14sp" />
 
             <Button
+                android:id="@+id/remove_sound_button"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/remove_sound" />
+
+            <Button
                 android:id="@+id/pick_sound_button"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
                 android:text="@string/pick_sound" />
         </LinearLayout>
 

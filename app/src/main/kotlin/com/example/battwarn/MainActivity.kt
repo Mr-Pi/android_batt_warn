@@ -69,6 +69,7 @@ class MainActivity : AppCompatActivity() {
         binding.monitorButton.setOnClickListener { toggleMonitoring() }
         binding.saveButton.setOnClickListener { saveSettings() }
         binding.pickSoundButton.setOnClickListener { pickSound() }
+        binding.removeSoundButton.setOnClickListener { removeSound() }
 
         requestNotificationPermissionIfNeeded()
         loadSettingsIntoFields()
@@ -114,7 +115,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateSoundLabel() {
         val uriText = AppSettings.criticalSoundUri(this)
-        binding.soundValue.text = if (uriText.isEmpty()) {
+        val silent = uriText.isEmpty()
+        binding.soundValue.text = if (silent) {
             getString(R.string.sound_silent)
         } else {
             try {
@@ -124,6 +126,14 @@ class MainActivity : AppCompatActivity() {
                 getString(R.string.sound_silent)
             }
         }
+        binding.removeSoundButton.isEnabled = !silent
+    }
+
+    private fun removeSound() {
+        AppSettings.prefs(this).edit()
+            .putString(AppSettings.KEY_CRITICAL_SOUND_URI, "")
+            .apply()
+        updateSoundLabel()
     }
 
     private fun pickSound() {

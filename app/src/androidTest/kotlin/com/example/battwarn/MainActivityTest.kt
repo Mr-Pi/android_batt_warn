@@ -1,9 +1,12 @@
 package com.example.battwarn
 
+import android.content.Context
 import android.widget.Button
 import android.widget.TextView
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -37,5 +40,43 @@ class MainActivityTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun removeSound_clearsUriAndShowsSilent() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        AppSettings.prefs(context).edit()
+            .putString(
+                AppSettings.KEY_CRITICAL_SOUND_URI,
+                "content://settings/system/notification_sound"
+            )
+            .commit()
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val value = activity.findViewById<TextView>(R.id.sound_value)
+                val remove = activity.findViewById<Button>(R.id.remove_sound_button)
+                assertTrue("remove button should be enabled with a tone", remove.isEnabled)
+
+                remove.performClick()
+
+                assertEquals(
+                    "remove must clear the stored tone",
+                    "",
+                    AppSettings.criticalSoundUri(context)
+                )
+                assertEquals(
+                    activity.getString(R.string.sound_silent),
+                    value.text.toString()
+                )
+                assertFalse("remove must disable itself once silent", remove.isEnabled)
+            }
+        }
+    }
+
+    @After
+    fun tearDown() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        AppSettings.prefs(context).edit().clear().commit()
     }
 }

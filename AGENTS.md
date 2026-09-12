@@ -112,7 +112,9 @@ Makefile                       # command wrappers
 - Settings live in `AppSettings` (SharedPreferences `battwarn_settings`):
   warning tier `alert_threshold`, `poll_interval_sec`, `toast_duration_sec`;
   critical tier `critical_threshold`, `critical_interval_sec`,
-  `critical_duration_sec` plus `critical_sound_uri` (empty = silent).
+  `critical_duration_sec` plus `critical_sound_uri` (empty = silent; pick a
+  tone with the ringtone picker, mute with the Remove sound button — the
+  service also honors silent/vibrate ringers).
   Validation ranges: thresholds 0-100 (critical ≤ alert), intervals 5-3600s,
   durations 1-30s. The service reads prefs fresh each poll, so saved values
   apply immediately.

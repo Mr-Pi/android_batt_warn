@@ -35,6 +35,7 @@
     <string name="label_sound">Alert sound</string>
     <string name="sound_silent">Silent</string>
     <string name="pick_sound">Pick sound</string>
+    <string name="remove_sound">Remove sound</string>
     <string name="save_settings">Save</string>
     <string name="error_alert">0–100</string>
     <string name="error_interval">5–3600</string>
