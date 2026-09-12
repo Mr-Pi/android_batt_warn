@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Batt Warn authors
+// SPDX-License-Identifier: MIT
 pluginManagement {
     repositories {
         google()

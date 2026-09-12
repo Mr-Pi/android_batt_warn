@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Batt Warn authors
+# SPDX-License-Identifier: MIT
+
 SHELL := bash
 
 APK         := app/build/outputs/apk/debug/app-debug.apk

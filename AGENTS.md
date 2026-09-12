@@ -130,6 +130,10 @@ docs/                          # architecture, behavior, testing, screenshots
   durations ≥ 1s with no upper cap. The service reads prefs fresh each
   poll, so saved values apply immediately.
 - `viewBinding` is enabled; use it in new layouts.
+- Every source file (Kotlin, XML, Gradle, shell, make) carries the SPDX header
+  `// SPDX-FileCopyrightText: 2026 Batt Warn authors` and
+  `// SPDX-License-Identifier: MIT` (XML uses `<!-- ... -->` comments; keep it
+  after the `<?xml ...?>` declaration). Keep the header on all new files.
 - Keep minSdk 28 / targetSdk 35 / compileSdk 35.
 - Use Kotlin, short names, happy-path alignment, wrap errors with context.
 

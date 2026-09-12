@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Batt Warn authors
+# SPDX-License-Identifier: MIT
+
 # Basic nix-shell for Android development (API 28+, build-only).
 # Usage: nix-shell
 #

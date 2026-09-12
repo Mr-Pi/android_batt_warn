@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Batt Warn authors -->
+<!-- SPDX-License-Identifier: MIT -->
 <resources>
     <style name="Theme.BattWarn" parent="Theme.Material3.DayNight">
         <item name="colorPrimary">@color/battery_green</item>

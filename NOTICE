@@ -1,0 +1,35 @@
+Batt Warn — Android battery monitor
+Copyright 2026 Batt Warn authors
+
+This software is licensed under the MIT License. See the LICENSE file in the
+top-level source directory for the full license text.
+
+Third-party notices
+-------------------
+
+The release APK bundles Android libraries that remain under their own
+licenses:
+
+- AndroidX (androidx.core:core-ktx 1.15.0, androidx.appcompat:appcompat 1.7.0,
+  androidx.constraintlayout:constraintlayout 2.2.0)
+  Copyright (c) The Android Open Source Project
+  Licensed under the Apache License, Version 2.0.
+  https://developer.android.com/jetpack/androidx
+
+- Material Components for Android (com.google.android.material:material 1.12.0)
+  Copyright (c) The Android Open Source Project
+  Licensed under the Apache License, Version 2.0.
+  https://github.com/material-components/material-components-android
+
+Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+Build- and test-only dependencies (JUnit 4, androidx.test, Gradle, Kotlin
+toolchain, OpenJDK, Nixpkgs) are not distributed with the app and are covered
+by their respective licenses.
+
+AI assistance
+-------------
+
+This project was developed with the assistance of AI-based coding tools. The
+maintainers review and take responsibility for the resulting code and
+documentation.

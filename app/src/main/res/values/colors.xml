@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Batt Warn authors -->
+<!-- SPDX-License-Identifier: MIT -->
 <resources>
     <color name="ic_launcher_background">#4CAF50</color>
     <color name="battery_green">#4CAF50</color>

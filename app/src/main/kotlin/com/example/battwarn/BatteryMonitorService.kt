@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Batt Warn authors
+// SPDX-License-Identifier: MIT
 package com.example.battwarn
 
 import android.app.Notification

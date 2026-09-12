@@ -1,5 +1,7 @@
 # Batt Warn
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 An Android battery monitor for Android 9+ that runs as a foreground service and
 alerts before the battery gets too low.
 
@@ -98,3 +100,37 @@ periodic background work.
 - [Architecture](docs/architecture.md)
 - [Behavior and settings](docs/behavior.md)
 - [Testing and development](docs/testing.md)
+
+## Third-party libraries
+
+The app uses the following libraries (all declared in
+[app/build.gradle.kts](app/build.gradle.kts)). Bundled runtime libraries are
+shipped inside the APK; the rest are build/test-only.
+
+Runtime (bundled in the APK):
+
+- [androidx.core:core-ktx 1.15.0](https://developer.android.com/jetpack/androidx) — Apache-2.0
+- [androidx.appcompat:appcompat 1.7.0](https://developer.android.com/jetpack/androidx) — Apache-2.0
+- [com.google.android.material:material 1.12.0](https://github.com/material-components/material-components-android) — Apache-2.0
+- [androidx.constraintlayout:constraintlayout 2.2.0](https://developer.android.com/jetpack/androidx) — Apache-2.0
+
+Build/test-only:
+
+- [junit:junit 4.13.2](https://github.com/junit-team/junit4) — EPL-1.0
+- [androidx.test:runner 1.6.2](https://developer.android.com/jetpack/androidx) — Apache-2.0
+- [androidx.test:rules 1.6.1](https://developer.android.com/jetpack/androidx) — Apache-2.0
+- [androidx.test:core-ktx 1.6.1](https://developer.android.com/jetpack/androidx) — Apache-2.0
+- [androidx.test.ext:junit 1.2.1](https://developer.android.com/jetpack/androidx) — Apache-2.0
+- [androidx.test.espresso:espresso-core 3.6.1](https://developer.android.com/jetpack/androidx) — Apache-2.0
+
+See [NOTICE](NOTICE) for the full third-party notices with copyright lines and
+the Apache-2.0 reference.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## AI assistance
+
+This project was developed with the assistance of AI-based coding tools. See
+[NOTICE](NOTICE) for the disclosure.

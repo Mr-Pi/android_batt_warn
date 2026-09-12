@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Batt Warn authors -->
+<!-- SPDX-License-Identifier: MIT -->
 <resources>
     <string name="app_name">Batt Warn</string>
     <string name="battery_placeholder">--%</string>
