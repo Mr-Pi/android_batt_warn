@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.battwarn.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -61,6 +62,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // The app draws behind the status bar; keep its icons readable by
+        // using dark icons in light mode (white icons in dark mode).
+        val insetsController = WindowInsetsControllerCompat(window, binding.root)
+        val darkMode = (resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        insetsController.isAppearanceLightStatusBars = !darkMode
+        insetsController.isAppearanceLightNavigationBars = !darkMode
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())

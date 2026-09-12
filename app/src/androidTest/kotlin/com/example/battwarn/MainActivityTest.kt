@@ -8,6 +8,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.core.view.WindowInsetsControllerCompat
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -48,6 +49,20 @@ class MainActivityTest {
                     "toggle must offer to start when the service is not running",
                     activity.getString(R.string.start_monitoring),
                     monitor.text.toString()
+                )
+
+                // Status bar icons must be readable on the bright surface:
+                // dark icons in light mode, light icons in dark mode.
+                val night = (activity.resources.configuration.uiMode and
+                    android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                    android.content.res.Configuration.UI_MODE_NIGHT_YES
+                val controller = WindowInsetsControllerCompat(
+                    activity.window, activity.findViewById(android.R.id.content)
+                )
+                assertEquals(
+                    "status bar icon appearance must follow the theme",
+                    !night,
+                    controller.isAppearanceLightStatusBars
                 )
             }
         }

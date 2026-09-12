@@ -103,6 +103,9 @@ Makefile                       # command wrappers
   background. Without it, the notification is the fallback.
 - The main screen shows the live battery level: the activity registers for
   `ACTION_BATTERY_CHANGED` while visible and re-renders on every change.
+- The main screen is edge-to-edge (insets handled in `MainActivity`): status
+  bar/nav bar icons switch to dark in light mode and stay white in dark mode
+  so they stay readable on the app surface.
 - The foreground-service notification is refreshed on every battery change
   (in both IDLE and ACTIVE) so it always shows the current level. Its title
   flips monitoring → warning → critical as the level crosses the thresholds.
