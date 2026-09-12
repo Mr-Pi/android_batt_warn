@@ -11,9 +11,13 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.example.battwarn.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -54,24 +58,47 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.startButton.setOnClickListener { startMonitoring() }
-        binding.stopButton.setOnClickListener { stopMonitoring() }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            view.setPadding(0, bars.top, 0, maxOf(bars.bottom, ime.bottom))
+            WindowInsetsCompat.CONSUMED
+        }
+
+        binding.monitorButton.setOnClickListener { toggleMonitoring() }
         binding.saveButton.setOnClickListener { saveSettings() }
         binding.pickSoundButton.setOnClickListener { pickSound() }
 
         requestNotificationPermissionIfNeeded()
         loadSettingsIntoFields()
-        refreshBattery()
     }
 
     override fun onResume() {
         super.onResume()
         refreshBattery()
+        refreshMonitorControls()
+    }
+
+    private fun refreshMonitorControls() {
+        val running = BatteryMonitorService.isRunning
+        binding.monitorButton.setText(
+            if (running) R.string.stop_monitoring else R.string.start_monitoring
+        )
+        binding.statusText.text = if (running) {
+            getString(R.string.status_running, AppSettings.alertThreshold(this))
+        } else {
+            getString(R.string.status_stopped)
+        }
+    }
+
+    private fun toggleMonitoring() {
         if (BatteryMonitorService.isRunning) {
-            binding.statusText.text = getString(
-                R.string.status_running,
-                AppSettings.alertThreshold(this)
-            )
+            stopMonitoring()
+            binding.monitorButton.setText(R.string.start_monitoring)
+            binding.statusText.text = getString(R.string.status_stopped)
+        } else {
+            startMonitoring()
         }
     }
 
@@ -180,18 +207,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshBattery() {
-        val sticky = registerBatteryIntent()
+        val sticky = stickyBattery()
         val level = sticky?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = sticky?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-        if (level > 0 && scale > 0) {
-            val percent = (level * 100) / scale
+        val percent = if (level >= 0 && scale > 0) (level * 100) / scale else -1
+        if (percent >= 0) {
             binding.batteryText.text = getString(R.string.battery_format, percent)
-            val colorRes = if (percent < AppSettings.alertThreshold(this)) {
-                R.color.battery_red
-            } else {
-                R.color.battery_green
-            }
-            binding.batteryText.setTextColor(ContextCompat.getColor(this, colorRes))
+            binding.batteryText.setTextColor(
+                ContextCompat.getColor(
+                    this,
+                    if (percent < AppSettings.alertThreshold(this)) R.color.battery_red
+                    else R.color.battery_green
+                )
+            )
         }
     }
 
@@ -209,22 +237,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Improve reliability of the background loop: exempt the app from Doze/app-standby.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(PowerManager::class.java)
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                batteryOptimizationLauncher.launch(
-                    Intent(
-                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                        Uri.parse("package:$packageName")
-                    )
+        val pm = getSystemService(PowerManager::class.java)
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            batteryOptimizationLauncher.launch(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName")
                 )
-            }
+            )
         }
 
         ContextCompat.startForegroundService(
             this,
             Intent(this, BatteryMonitorService::class.java)
         )
+        binding.monitorButton.setText(R.string.stop_monitoring)
         binding.statusText.text = getString(
             R.string.status_running,
             AppSettings.alertThreshold(this)
@@ -245,7 +272,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun registerBatteryIntent(): android.content.Intent? {
+    private fun stickyBattery(): android.content.Intent? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         } else {
