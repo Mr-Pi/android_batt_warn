@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Batt Warn</string>
+    <string name="battery_placeholder">--%</string>
+    <string name="battery_format">%1$d%%</string>
+    <string name="start_monitoring">Start monitoring</string>
+    <string name="stop_monitoring">Stop monitoring</string>
+    <string name="status_stopped">Monitoring stopped</string>
+    <string name="status_running">Monitoring battery — alert below %1$d%%</string>
+    <string name="status_saved">Settings saved — alert below %1$d%%</string>
+    <string name="toast_battery_critical">Battery critically low: %1$d%%</string>
+    <string name="channel_name">Battery monitor</string>
+    <string name="notif_title_monitoring">Battery monitor active</string>
+    <string name="notif_title_critical">BATTERY CRITICALLY LOW</string>
+    <string name="notif_text_level">Battery at %1$d%%</string>
+    <string name="notif_text_unknown">Battery level unknown</string>
+
+    <!-- Settings section -->
+    <string name="settings_title">Alert settings</string>
+    <string name="label_alert">Alert below (%)</string>
+    <string name="desc_alert">When the battery drops below this level, the alert starts showing.</string>
+    <string name="label_interval">Alert interval (seconds)</string>
+    <string name="desc_interval">Seconds between each toast while below the alert level.</string>
+    <string name="label_duration">Toast duration (seconds)</string>
+    <string name="desc_duration">How many seconds each alert toast stays on screen.</string>
+    <string name="hint_auto_recover">Alerts stop automatically once the battery rises back above the alert level.</string>
+    <string name="save_settings">Save</string>
+    <string name="error_alert">Enter a value between 0 and 100</string>
+    <string name="error_interval">Enter a value between 5 and 3600</string>
+    <string name="error_duration">Enter a value between 1 and 30</string>
+</resources>
