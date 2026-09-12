@@ -32,12 +32,12 @@ object AppSettings {
     /** Quiet pause, in milliseconds, after an alert banner closes before the next one shows. */
     fun pollIntervalMillis(context: Context): Long =
         prefs(context).getInt(KEY_POLL_INTERVAL_SEC, DEFAULT_POLL_INTERVAL_SEC)
-            .coerceIn(5, 3600) * 1000L
+            .coerceAtLeast(1) * 1000L
 
     /** How long each alert toast stays on screen, in milliseconds. */
     fun toastDurationMillis(context: Context): Long =
         prefs(context).getInt(KEY_TOAST_DURATION_SEC, DEFAULT_TOAST_DURATION_SEC)
-            .coerceIn(1, 30) * 1000L
+            .coerceAtLeast(1) * 1000L
 
     /** Critical level in percent — always at or below the alert threshold. */
     fun criticalThreshold(context: Context): Int =
@@ -47,12 +47,12 @@ object AppSettings {
     /** Quiet pause, in milliseconds, after a critical banner closes before the next one. */
     fun criticalIntervalMillis(context: Context): Long =
         prefs(context).getInt(KEY_CRITICAL_INTERVAL_SEC, DEFAULT_CRITICAL_INTERVAL_SEC)
-            .coerceIn(5, 3600) * 1000L
+            .coerceAtLeast(1) * 1000L
 
     /** How long each critical alert banner stays on screen, in milliseconds. */
     fun criticalDurationMillis(context: Context): Long =
         prefs(context).getInt(KEY_CRITICAL_DURATION_SEC, DEFAULT_CRITICAL_DURATION_SEC)
-            .coerceIn(1, 30) * 1000L
+            .coerceAtLeast(1) * 1000L
 
     /** Ringtone URI string for the critical alert sound (empty = silent). */
     fun criticalSoundUri(context: Context): String =

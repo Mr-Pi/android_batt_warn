@@ -120,9 +120,9 @@ Makefile                       # command wrappers
   `critical_duration_sec` plus `critical_sound_uri` (empty = silent; pick a
   tone with the ringtone picker, mute with the Remove sound button — the
   service also honors silent/vibrate ringers).
-  Validation ranges: thresholds 0-100 (critical ≤ alert), intervals 5-3600s,
-  durations 1-30s. The service reads prefs fresh each poll, so saved values
-  apply immediately.
+  Validation ranges: thresholds 0-100 (critical ≤ alert); intervals and
+  durations ≥ 1s with no upper cap. The service reads prefs fresh each
+  poll, so saved values apply immediately.
 - `viewBinding` is enabled; use it in new layouts.
 - Keep minSdk 28 / targetSdk 35 / compileSdk 35.
 - Use Kotlin, short names, happy-path alignment, wrap errors with context.

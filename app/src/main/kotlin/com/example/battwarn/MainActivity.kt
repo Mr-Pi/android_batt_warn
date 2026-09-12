@@ -201,11 +201,11 @@ class MainActivity : AppCompatActivity() {
         var valid = true
 
         val alertValid = alert != null && alert in 0..100
-        val intervalValid = intervalSec != null && intervalSec in 5..3600
-        val durationValid = durationSec != null && durationSec in 1..30
+        val intervalValid = intervalSec != null && intervalSec > 0
+        val durationValid = durationSec != null && durationSec > 0
         val criticalValid = critical != null && critical in 0..100
-        val criticalIntervalValid = criticalIntervalSec != null && criticalIntervalSec in 5..3600
-        val criticalDurationValid = criticalDurationSec != null && criticalDurationSec in 1..30
+        val criticalIntervalValid = criticalIntervalSec != null && criticalIntervalSec > 0
+        val criticalDurationValid = criticalDurationSec != null && criticalDurationSec > 0
         val criticalLeAlert = critical != null && alert != null && critical <= alert
 
         binding.alertField.error = if (alertValid) null else getString(R.string.error_alert)
