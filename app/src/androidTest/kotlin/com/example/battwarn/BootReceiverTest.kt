@@ -25,7 +25,11 @@ class BootReceiverTest {
 
     @After
     fun tearDown() {
-        context.stopService(Intent(context, BatteryMonitorService::class.java))
+        // Ensure startForeground already ran (isRunning flips after it) to
+        // avoid the system's "did not call startForeground in time" crash.
+        if (await(8_000L) { BatteryMonitorService.isRunning }) {
+            context.stopService(Intent(context, BatteryMonitorService::class.java))
+        }
     }
 
     @Test
@@ -87,5 +91,14 @@ class BootReceiverTest {
             Thread.sleep(200)
         }
         return false
+    }
+
+    private fun await(timeoutMs: Long, condition: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return true
+            Thread.sleep(200)
+        }
+        return condition()
     }
 }

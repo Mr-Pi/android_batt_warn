@@ -30,7 +30,11 @@ class ServiceSmokeTest {
 
     @After
     fun tearDown() {
-        context.stopService(Intent(context, BatteryMonitorService::class.java))
+        // Ensure startForeground already ran (isRunning flips after it) to
+        // avoid the system's "did not call startForeground in time" crash.
+        if (await(8_000L) { BatteryMonitorService.isRunning }) {
+            context.stopService(Intent(context, BatteryMonitorService::class.java))
+        }
     }
 
     @Test
@@ -62,7 +66,11 @@ class ServiceSmokeTest {
         await(10_000) { BatteryMonitorService.isRunning }
         assertTrue("service did not set isRunning", BatteryMonitorService.isRunning)
 
-        context.stopService(Intent(context, BatteryMonitorService::class.java))
+        // Ensure startForeground already ran (isRunning flips after it) to
+        // avoid the system's "did not call startForeground in time" crash.
+        if (await(8_000L) { BatteryMonitorService.isRunning }) {
+            context.stopService(Intent(context, BatteryMonitorService::class.java))
+        }
         assertTrue(
             "service still reports running after stop",
             await(10_000) { !BatteryMonitorService.isRunning }

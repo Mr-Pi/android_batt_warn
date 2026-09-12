@@ -79,9 +79,10 @@ class BatteryMonitorService : Service() {
         val threshold = AppSettings.alertThreshold(this)
         val criticalThreshold = AppSettings.criticalThreshold(this)
         val level = currentBatteryLevel()
-        startForeground(NOTIFICATION_ID, buildNotification(level, threshold, criticalThreshold))
+        val suppressed = isChargingNow() && AppSettings.warnOnlyOnBattery(this)
+        startForeground(NOTIFICATION_ID, buildNotification(level, threshold, criticalThreshold, suppressed))
         registerBatteryActions()
-        if (level in 0 until threshold) {
+        if (level in 0 until threshold && !suppressed) {
             startPolling()
         }
         isRunning = true
@@ -140,19 +141,31 @@ class BatteryMonitorService : Service() {
         val level = levelFrom(intent)
         val alertThreshold = AppSettings.alertThreshold(this)
         val criticalThreshold = AppSettings.criticalThreshold(this)
-        updateNotification(level, alertThreshold, criticalThreshold)
-        if (level >= 0 && level < alertThreshold) startPolling() else stopPolling()
+        val suppressed = isChargingNow() && AppSettings.warnOnlyOnBattery(this)
+        updateNotification(level, alertThreshold, criticalThreshold, suppressed)
+        when {
+            // Charging with the setting on: pause — also cancels a pending
+            // post-dismiss poll from an already-running cycle.
+            suppressed -> stopPolling()
+            level >= 0 && level < alertThreshold -> startPolling()
+            else -> stopPolling()
+        }
     }
 
-    private fun currentBatteryLevel(): Int {
-        // Sticky system broadcast — no BatteryManager permission needed.
-        val sticky = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    /** Plugged into AC/USB/wireless right now? */
+    private fun isChargingNow(): Boolean =
+        stickyBattery()?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+
+    private fun currentBatteryLevel(): Int = levelFrom(stickyBattery())
+
+    /** The sticky current battery broadcast — no permission needed. */
+    private fun stickyBattery(): Intent? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         } else {
             @Suppress("DEPRECATION")
             registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         }
-        return levelFrom(sticky)
     }
 
     private fun levelFrom(intent: Intent?): Int {
@@ -228,8 +241,14 @@ class BatteryMonitorService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private fun buildNotification(level: Int, alertThreshold: Int, criticalThreshold: Int): Notification {
+    private fun buildNotification(
+        level: Int,
+        alertThreshold: Int,
+        criticalThreshold: Int,
+        suppressed: Boolean = false
+    ): Notification {
         val title = when {
+            suppressed && level >= 0 && level < alertThreshold -> getString(R.string.notif_title_monitoring)
             level >= 0 && level < criticalThreshold -> getString(R.string.notif_title_critical)
             level >= 0 && level < alertThreshold -> getString(R.string.notif_title_warning)
             else -> getString(R.string.notif_title_monitoring)
@@ -249,9 +268,14 @@ class BatteryMonitorService : Service() {
             .build()
     }
 
-    private fun updateNotification(level: Int, alertThreshold: Int, criticalThreshold: Int) {
+    private fun updateNotification(
+        level: Int,
+        alertThreshold: Int,
+        criticalThreshold: Int,
+        suppressed: Boolean = false
+    ) {
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildNotification(level, alertThreshold, criticalThreshold))
+            .notify(NOTIFICATION_ID, buildNotification(level, alertThreshold, criticalThreshold, suppressed))
     }
 
     companion object {

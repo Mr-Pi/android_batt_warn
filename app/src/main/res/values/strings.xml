@@ -21,8 +21,9 @@
     <string name="settings_title">Alert settings</string>
     <string name="warning_title">Warning</string>
     <string name="critical_title">Critical</string>
-    <string name="note_warning">Alerts repeat below the alert level until the battery recovers.</string>
+    <string name="note_warning">Alerts repeat below the alert level until the battery recovers. Alerts pause while charging.</string>
     <string name="note_critical">Below the critical level: own timings and the alert sound.</string>
+    <string name="warn_on_battery">Warn only on battery</string>
     <string name="label_alert">Alert below %</string>
     <string name="label_interval">Interval s</string>
     <string name="label_duration">Duration s</string>

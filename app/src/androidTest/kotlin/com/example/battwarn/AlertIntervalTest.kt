@@ -27,7 +27,11 @@ class AlertIntervalTest {
 
     @After
     fun tearDown() {
-        context.stopService(Intent(context, BatteryMonitorService::class.java))
+        // Ensure startForeground already ran (isRunning flips after it) to
+        // avoid the system's "did not call startForeground in time" crash.
+        if (await(8_000L) { BatteryMonitorService.isRunning }) {
+            context.stopService(Intent(context, BatteryMonitorService::class.java))
+        }
         shell("appops set ${context.packageName} SYSTEM_ALERT_WINDOW default")
         shell("dumpsys battery reset")
         AppSettings.prefs(context).edit().clear().commit()
@@ -44,6 +48,7 @@ class AlertIntervalTest {
             .putInt(AppSettings.KEY_POLL_INTERVAL_SEC, 1)
             .putInt(AppSettings.KEY_TOAST_DURATION_SEC, 1)
             .commit()
+        shell("dumpsys battery set ac 0")
         shell("dumpsys battery set level 50")
 
         ActivityScenario.launch(MainActivity::class.java).use {

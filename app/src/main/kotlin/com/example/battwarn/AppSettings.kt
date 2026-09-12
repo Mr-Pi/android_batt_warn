@@ -13,6 +13,7 @@ object AppSettings {
     const val KEY_CRITICAL_INTERVAL_SEC = "critical_interval_sec"
     const val KEY_CRITICAL_DURATION_SEC = "critical_duration_sec"
     const val KEY_CRITICAL_SOUND_URI = "critical_sound_uri"
+    const val KEY_WARN_ONLY_ON_BATTERY = "warn_only_on_battery"
 
     const val DEFAULT_ALERT_THRESHOLD = 10
     const val DEFAULT_POLL_INTERVAL_SEC = 25
@@ -21,6 +22,7 @@ object AppSettings {
     const val DEFAULT_CRITICAL_INTERVAL_SEC = 15
     const val DEFAULT_CRITICAL_DURATION_SEC = 5
     const val DEFAULT_CRITICAL_SOUND_URI = ""
+    const val DEFAULT_WARN_ONLY_ON_BATTERY = true
 
     fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -57,4 +59,11 @@ object AppSettings {
     /** Ringtone URI string for the critical alert sound (empty = silent). */
     fun criticalSoundUri(context: Context): String =
         prefs(context).getString(KEY_CRITICAL_SOUND_URI, DEFAULT_CRITICAL_SOUND_URI) ?: ""
+
+    /**
+     * True (default) pauses all warnings while the device is charging;
+     * false keeps warning on AC/USB/wireless too.
+     */
+    fun warnOnlyOnBattery(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_WARN_ONLY_ON_BATTERY, DEFAULT_WARN_ONLY_ON_BATTERY)
 }

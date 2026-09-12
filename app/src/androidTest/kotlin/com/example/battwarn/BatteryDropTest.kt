@@ -29,7 +29,11 @@ class BatteryDropTest {
 
     @After
     fun tearDown() {
-        context.stopService(Intent(context, BatteryMonitorService::class.java))
+        // Ensure startForeground already ran (isRunning flips after it) to
+        // avoid the system's "did not call startForeground in time" crash.
+        if (await(8_000L) { BatteryMonitorService.isRunning }) {
+            context.stopService(Intent(context, BatteryMonitorService::class.java))
+        }
         shell("dumpsys battery reset")
         AppSettings.prefs(context).edit().clear().commit()
     }
@@ -52,6 +56,7 @@ class BatteryDropTest {
             assertTrue("service did not start", await(10_000) { BatteryMonitorService.isRunning })
 
             // Drop the battery below the alert threshold (but above critical).
+            shell("dumpsys battery set ac 0")
             shell("dumpsys battery set level 50")
 
             val nm = context.getSystemService(NotificationManager::class.java)

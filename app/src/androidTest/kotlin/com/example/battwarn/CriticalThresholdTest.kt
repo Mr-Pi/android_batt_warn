@@ -29,7 +29,11 @@ class CriticalThresholdTest {
 
     @After
     fun tearDown() {
-        context.stopService(Intent(context, BatteryMonitorService::class.java))
+        // Ensure startForeground already ran (isRunning flips after it) to
+        // avoid the system's "did not call startForeground in time" crash.
+        if (await(8_000L) { BatteryMonitorService.isRunning }) {
+            context.stopService(Intent(context, BatteryMonitorService::class.java))
+        }
         shell("dumpsys battery reset")
         AppSettings.prefs(context).edit().clear().commit()
     }
@@ -46,6 +50,7 @@ class CriticalThresholdTest {
             await(10_000) { BatteryMonitorService.isRunning }
 
             // Between critical (50) and alert (90): warning tier.
+            shell("dumpsys battery set ac 0")
             shell("dumpsys battery set level 60")
 
             val warningTitle = context.getString(R.string.notif_title_warning)
@@ -67,6 +72,7 @@ class CriticalThresholdTest {
             await(10_000) { BatteryMonitorService.isRunning }
 
             // Below the critical threshold: critical tier.
+            shell("dumpsys battery set ac 0")
             shell("dumpsys battery set level 40")
 
             val criticalTitle = context.getString(R.string.notif_title_critical)

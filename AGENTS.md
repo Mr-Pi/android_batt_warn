@@ -96,6 +96,9 @@ Makefile                       # command wrappers
     a quiet pause between alerts. Without overlay permission there is no
     banner, so the next cycle is scheduled interval seconds after the
     previous one started instead.
+  - With `warn_only_on_battery` (default on), all warnings pause while the
+    device is plugged in (AC/USB/wireless) and resume on unplug — the
+    notification keeps showing the level with the monitoring title meanwhile.
   - Exits when the level rises back above the alert threshold or on
     `ACTION_BATTERY_OKAY`.
 - The alert is a floating banner (OverlayAlert) when the "Display over other
@@ -119,7 +122,8 @@ Makefile                       # command wrappers
   critical tier `critical_threshold`, `critical_interval_sec`,
   `critical_duration_sec` plus `critical_sound_uri` (empty = silent; pick a
   tone with the ringtone picker, mute with the Remove sound button — the
-  service also honors silent/vibrate ringers).
+  service also honors silent/vibrate ringers) and `warn_only_on_battery`
+  (default on; checkbox "Warn only on battery" pauses alerts while charging).
   Validation ranges: thresholds 0-100 (critical ≤ alert); intervals and
   durations ≥ 1s with no upper cap. The service reads prefs fresh each
   poll, so saved values apply immediately.

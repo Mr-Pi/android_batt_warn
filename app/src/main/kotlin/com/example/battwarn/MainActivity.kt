@@ -145,6 +145,7 @@ class MainActivity : AppCompatActivity() {
         binding.criticalField.setText(AppSettings.criticalThreshold(this).toString())
         binding.criticalIntervalField.setText((AppSettings.criticalIntervalMillis(this) / 1000L).toString())
         binding.criticalDurationField.setText((AppSettings.criticalDurationMillis(this) / 1000L).toString())
+        binding.warnOnBatteryCheck.isChecked = AppSettings.warnOnlyOnBattery(this)
         updateSoundLabel()
     }
 
@@ -238,6 +239,7 @@ class MainActivity : AppCompatActivity() {
             .putInt(AppSettings.KEY_CRITICAL_THRESHOLD, critical!!)
             .putInt(AppSettings.KEY_CRITICAL_INTERVAL_SEC, criticalIntervalSec!!)
             .putInt(AppSettings.KEY_CRITICAL_DURATION_SEC, criticalDurationSec!!)
+            .putBoolean(AppSettings.KEY_WARN_ONLY_ON_BATTERY, binding.warnOnBatteryCheck.isChecked)
             .apply()
 
         // Restart so the running service applies the new values immediately.
