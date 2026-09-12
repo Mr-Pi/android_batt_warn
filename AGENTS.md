@@ -78,6 +78,8 @@ app/src/androidTest/kotlin/com/example/battwarn/
   OverlayAlertTest.kt          # overlay permission + banner render/hide/dismiss callback
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
+README.md                      # project overview and quick start
+docs/                          # architecture, behavior, testing, screenshots
 ```
 
 ## Behavior
