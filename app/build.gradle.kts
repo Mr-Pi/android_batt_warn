@@ -11,6 +11,27 @@ android {
     namespace = "com.example.battwarn"
     compileSdk = 35
 
+    // Generate raw-legal resources from the repo's single source of truth:
+    // LICENSE (MIT), NOTICE (third-party attributions) and the full
+    // Apache-2.0 text needed to convey the bundled Apache-2.0 libraries.
+    val legalResDir = layout.buildDirectory.dir("generated/legal/res")
+    val generateLegalResources by tasks.registering(Copy::class) {
+        from(rootProject.file("LICENSE")) { rename { "mit_license.txt" } }
+        from(rootProject.file("NOTICE")) { rename { "third_party_notices.txt" } }
+        from(rootProject.file("LICENSES/Apache-2.0.txt")) { rename { "apache_license_2_0.txt" } }
+        into(legalResDir.map { it.dir("raw") })
+    }
+
+    sourceSets {
+        getByName("main") {
+            res.srcDir(legalResDir)
+        }
+    }
+
+    tasks.named("preBuild") {
+        dependsOn(generateLegalResources)
+    }
+
     defaultConfig {
         applicationId = "com.example.battwarn"
         minSdk = 28

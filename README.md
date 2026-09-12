@@ -128,7 +128,12 @@ the Apache-2.0 reference.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The app ships the licenses inside it: the
+**About** screen in the app shows the MIT license, third-party notices for the
+bundled Apache-2.0 libraries, and the privacy statement. The in-app texts are
+generated at build time from [LICENSE](LICENSE), [NOTICE](NOTICE), and
+[LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt), so each legal text is
+maintained in exactly one place.
 
 ## AI assistance
 

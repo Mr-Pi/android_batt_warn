@@ -83,6 +83,9 @@ class MainActivity : AppCompatActivity() {
         binding.saveButton.setOnClickListener { saveSettings() }
         binding.pickSoundButton.setOnClickListener { pickSound() }
         binding.removeSoundButton.setOnClickListener { removeSound() }
+        binding.aboutButton.setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
 
         requestNotificationPermissionIfNeeded()
         loadSettingsIntoFields()
