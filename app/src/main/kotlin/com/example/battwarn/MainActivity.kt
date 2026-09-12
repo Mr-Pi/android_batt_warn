@@ -29,6 +29,11 @@ class MainActivity : AppCompatActivity() {
             // Result irrelevant; the system settings screen shows the toggle.
         }
 
+    private val overlayPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            // Result irrelevant; the system settings screen shows the toggle.
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -113,6 +118,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun startMonitoring() {
         requestNotificationPermissionIfNeeded()
+
+        // Needed so the alert banner is visible even over other apps.
+        if (!Settings.canDrawOverlays(this)) {
+            overlayPermissionLauncher.launch(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        }
 
         // Improve reliability of the background loop: exempt the app from Doze/app-standby.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

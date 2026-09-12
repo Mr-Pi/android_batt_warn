@@ -13,7 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.widget.Toast
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 
 /**
@@ -25,11 +25,12 @@ import androidx.core.app.NotificationCompat
  * level drops below the alert threshold.
  *
  * ACTIVE mode (battery below the alert threshold): poll every configured
- * interval and show a toast. The FGS notification is refreshed on every
+ * interval and show an alert. The FGS notification is refreshed on every
  * battery change (in both IDLE and ACTIVE) so it always reflects the current
- * level — a fallback surface since toasts are blocked in the background
- * (Android 10+ restriction). Polling stops when the battery rises back above
- * the alert threshold or on ACTION_BATTERY_OKAY.
+ * level. When the "Display over other apps" permission is granted the alert
+ * is a floating banner (visible even in the background); otherwise the
+ * notification is the fallback surface. Polling stops when the battery rises
+ * back above the alert threshold or on ACTION_BATTERY_OKAY.
  *
  * All thresholds/timings are read from SharedPreferences (see [AppSettings]).
  */
@@ -37,6 +38,7 @@ class BatteryMonitorService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var polling = false
+    private var overlayAlert: OverlayAlert? = null
 
     private val batteryActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -54,7 +56,7 @@ class BatteryMonitorService : Service() {
             val threshold = AppSettings.alertThreshold(this@BatteryMonitorService)
             updateNotification(level, threshold)
             if (level >= 0 && level < threshold) {
-                showLowBatteryToast(level)
+                showLowBatteryAlert(level)
                 handler.postDelayed(
                     this,
                     AppSettings.pollIntervalMillis(this@BatteryMonitorService)
@@ -81,6 +83,7 @@ class BatteryMonitorService : Service() {
     override fun onDestroy() {
         isRunning = false
         stopPolling()
+        overlayAlert?.hide()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             unregisterReceiver(batteryActionReceiver)
         } else {
@@ -143,15 +146,13 @@ class BatteryMonitorService : Service() {
         return if (level >= 0 && scale > 0) (level * 100) / scale else -1
     }
 
-    private fun showLowBatteryToast(level: Int) {
-        val toast = Toast.makeText(
-            this,
+    private fun showLowBatteryAlert(level: Int) {
+        if (!Settings.canDrawOverlays(this)) return // notification is the fallback
+        val alert = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
+        alert.show(
             getString(R.string.toast_battery_critical, level),
-            Toast.LENGTH_LONG
+            AppSettings.toastDurationMillis(this)
         )
-        toast.show()
-        // No native "N seconds" toast duration — LENGTH_LONG then cancel.
-        handler.postDelayed({ toast.cancel() }, AppSettings.toastDurationMillis(this))
     }
 
     private fun createNotificationChannel() {
