@@ -31,7 +31,7 @@ make run          # install + start MainActivity
 make clean        # gradle clean
 make devices      # adb devices
 make emulator     # boot headless API 35 emulator (AVD "test") if not running
-make test         # gradle connectedDebugAndroidTest on the running emulator
+make test         # gradle connectedDebugAndroidTest + per-test PASS/FAIL summary
 make test-boot    # boot emulator (waits for boot) then run instrumented tests
 ```
 
@@ -42,6 +42,9 @@ gradle assembleDebug            # build debug APK
 gradle lintDebug                # Android Lint
 gradle testUnitTest             # JVM unit tests (none currently)
 gradle connectedDebugAndroidTest  # instrumented tests (emulator must be up)
+
+make test streams failures live while running and ends with a per-test
+PASS/FAIL summary parsed from the XML report (scripts/test-report.sh).
 ```
 
 Instrumented tests cover the autostart contract (BootReceiver resolves for

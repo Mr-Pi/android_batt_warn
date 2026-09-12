@@ -45,7 +45,7 @@ emulator: ## Boot the API 35 headless emulator (AVD "$(AVD)") if not running
 	fi'
 
 test: ## Run instrumented tests (requires a running emulator)
-	nix-shell --run 'gradle connectedDebugAndroidTest'
+	nix-shell --run 'gradle connectedDebugAndroidTest; status=$$?; bash scripts/test-report.sh; exit $$status'
 
 test-boot: emulator ## Boot emulator (+wait) then run instrumented tests
 	nix-shell --run 'adb wait-for-device && until [ "$$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done && gradle connectedDebugAndroidTest'
