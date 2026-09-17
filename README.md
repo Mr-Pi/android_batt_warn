@@ -67,7 +67,9 @@ The app has two tiers:
 - **Warning**: `critical_threshold <= level < alert_threshold`; uses warning
   duration and interval, without sound.
 - **Critical**: `level < critical_threshold`; uses critical duration and
-  interval, and plays the selected sound unless the ringer is silent/vibrate.
+  interval, and plays the selected sound unless the ringer is silent/vibrate —
+  with the "Play critical sound in silent / Do Not Disturb" option it plays
+  even then (on the alarm channel).
 
 The interval is a quiet pause measured **after** the previous banner closes,
 whether it auto-dismissed or was tapped. If the overlay permission is absent,

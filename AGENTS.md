@@ -56,7 +56,9 @@ level flips the notification to the warning title), the overlay banner
 (SYSTEM_ALERT_WINDOW), the two-tier split (warning vs critical title across
 the critical threshold, criticalThreshold clamped to alertThreshold), the
 overlay dismiss callback (fires exactly once on auto-dismiss or tap, never
-when the overlay cannot be shown), and the main activity UI.
+when the overlay cannot be shown), the silent/DND override (alarm-stream
+attributes + plays in silent/vibrate with the setting on, blocked without),
+and the main activity UI.
 
 ## Project layout
 
@@ -76,6 +78,7 @@ app/src/androidTest/kotlin/com/example/battwarn/
   BatteryDropTest.kt           # threshold detection end-to-end
   CriticalThresholdTest.kt     # two-tier warning/critical split
   OverlayAlertTest.kt          # overlay permission + banner render/hide/dismiss callback
+  OverrideSilentDndTest.kt     # silent/DND override setting + UI round-trip
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
 README.md                      # project overview and quick start
@@ -124,7 +127,9 @@ docs/                          # architecture, behavior, testing, screenshots
   critical tier `critical_threshold`, `critical_interval_sec`,
   `critical_duration_sec` plus `critical_sound_uri` (empty = silent; pick a
   tone with the ringtone picker, mute with the Remove sound button — the
-  service also honors silent/vibrate ringers) and `warn_only_on_battery`
+  service also honors silent/vibrate ringers unless `override_silent_dnd` is
+  on, which routes the critical sound to the alarm channel so it plays in
+  silent/vibrate and typical Do Not Disturb) and `warn_only_on_battery`
   (default on; checkbox "Warn only on battery" pauses alerts while charging).
   Validation ranges: thresholds 0-100 (critical ≤ alert); intervals and
   durations ≥ 1s with no upper cap. The service reads prefs fresh each

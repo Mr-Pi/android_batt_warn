@@ -151,6 +151,7 @@ class MainActivity : AppCompatActivity() {
         binding.criticalIntervalField.setText((AppSettings.criticalIntervalMillis(this) / 1000L).toString())
         binding.criticalDurationField.setText((AppSettings.criticalDurationMillis(this) / 1000L).toString())
         binding.warnOnBatteryCheck.isChecked = AppSettings.warnOnlyOnBattery(this)
+        binding.overrideSilentCheck.isChecked = AppSettings.overrideSilentDnd(this)
         updateSoundLabel()
     }
 
@@ -245,6 +246,7 @@ class MainActivity : AppCompatActivity() {
             .putInt(AppSettings.KEY_CRITICAL_INTERVAL_SEC, criticalIntervalSec!!)
             .putInt(AppSettings.KEY_CRITICAL_DURATION_SEC, criticalDurationSec!!)
             .putBoolean(AppSettings.KEY_WARN_ONLY_ON_BATTERY, binding.warnOnBatteryCheck.isChecked)
+            .putBoolean(AppSettings.KEY_OVERRIDE_SILENT_DND, binding.overrideSilentCheck.isChecked)
             .apply()
 
         // Restart so the running service applies the new values immediately.

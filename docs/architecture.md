@@ -55,6 +55,7 @@ Settings are stored in `battwarn_settings`:
 | `critical_duration_sec` | 5 | Critical banner duration, seconds |
 | `critical_sound_uri` | empty | Picked notification sound; empty is silent |
 | `warn_only_on_battery` | true | Suppress warnings while AC/USB/wireless charging |
+| `override_silent_dnd` | false | Play critical sound in silent/vibrate/DND (alarm stream) |
 
 Intervals and durations accept values of one second or greater with no upper
 cap. Critical threshold is always clamped to the alert threshold.

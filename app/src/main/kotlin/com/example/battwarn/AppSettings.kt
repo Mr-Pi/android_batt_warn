@@ -16,6 +16,7 @@ object AppSettings {
     const val KEY_CRITICAL_DURATION_SEC = "critical_duration_sec"
     const val KEY_CRITICAL_SOUND_URI = "critical_sound_uri"
     const val KEY_WARN_ONLY_ON_BATTERY = "warn_only_on_battery"
+    const val KEY_OVERRIDE_SILENT_DND = "override_silent_dnd"
 
     const val DEFAULT_ALERT_THRESHOLD = 10
     const val DEFAULT_POLL_INTERVAL_SEC = 25
@@ -25,6 +26,7 @@ object AppSettings {
     const val DEFAULT_CRITICAL_DURATION_SEC = 5
     const val DEFAULT_CRITICAL_SOUND_URI = ""
     const val DEFAULT_WARN_ONLY_ON_BATTERY = true
+    const val DEFAULT_OVERRIDE_SILENT_DND = false
 
     fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -68,4 +70,12 @@ object AppSettings {
      */
     fun warnOnlyOnBattery(context: Context): Boolean =
         prefs(context).getBoolean(KEY_WARN_ONLY_ON_BATTERY, DEFAULT_WARN_ONLY_ON_BATTERY)
+
+    /**
+     * True makes the critical alert sound play even when the ringer is silent,
+     * on vibrate, or the device is in Do Not Disturb. False (default) honors
+     * the ringer state and plays only in RINGER_MODE_NORMAL.
+     */
+    fun overrideSilentDnd(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_OVERRIDE_SILENT_DND, DEFAULT_OVERRIDE_SILENT_DND)
 }

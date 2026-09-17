@@ -28,6 +28,12 @@ Use **Pick sound** to open Android's notification ringtone picker. **Remove
 sound** or choosing **Silent** stores an empty sound URI and disables playback.
 The service also respects Android's silent/vibrate ringer state.
 
+**Play critical sound in silent / Do Not Disturb** (off by default) makes the
+critical alert sound play even when the ringer is silent, on vibrate, or the
+device is in Do Not Disturb. It routes the tone to the alarm stream, which
+Android does not mute with a silent ringer and exempts from typical DND. The
+one case it cannot pierce is a DND rule configured to silence alarms as well.
+
 ## Overlay and notification fallback
 
 With the “Display over other apps” permission, the service displays a red bottom

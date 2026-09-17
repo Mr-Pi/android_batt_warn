@@ -10,6 +10,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.Ringtone
 import android.media.RingtoneManager
@@ -218,15 +219,23 @@ class BatteryMonitorService : Service() {
         if (critical) playCriticalSound()
     }
 
-    /** Plays the user-picked notification sound; silent pick or muted ringer means no sound. */
+    /**
+     * Plays the user-picked notification sound. By default it honors the
+     * ringer: silent pick, silent/vibrate ringer, or Do Not Disturb means no
+     * sound. With [AppSettings.overrideSilentDnd] the tone is routed to the
+     * alarm stream so it plays in silent/vibrate and typical DND — except a
+     * DND rule configured to silence alarms as well, which no app can pierce.
+     */
     private fun playCriticalSound() {
         val uriText = AppSettings.criticalSoundUri(this)
         if (uriText.isEmpty()) return
+        val override = AppSettings.overrideSilentDnd(this)
         val ringer = getSystemService(AudioManager::class.java).ringerMode
-        if (ringer != AudioManager.RINGER_MODE_NORMAL) return
+        if (!shouldPlayCriticalSound(override, ringer)) return
         try {
             val ringtone = RingtoneManager.getRingtone(this, Uri.parse(uriText))
             criticalRingtone?.stop()
+            if (override) ringtone?.audioAttributes = criticalSoundAlarmAttributes()
             ringtone?.play()
             criticalRingtone = ringtone
         } catch (e: Exception) {
@@ -298,3 +307,17 @@ class BatteryMonitorService : Service() {
             private set
     }
 }
+
+/** Whether the critical sound is allowed at the given ringer mode. */
+internal fun shouldPlayCriticalSound(overrideSilentOrDnd: Boolean, ringerMode: Int): Boolean =
+    overrideSilentOrDnd || ringerMode == AudioManager.RINGER_MODE_NORMAL
+
+/**
+ * Audio attributes that route the critical sound to the alarm stream, which
+ * Android keeps audible in silent/vibrate ringer and typical Do Not Disturb.
+ */
+internal fun criticalSoundAlarmAttributes(): AudioAttributes =
+    AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ALARM)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
