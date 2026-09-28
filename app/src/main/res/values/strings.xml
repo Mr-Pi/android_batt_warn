@@ -33,6 +33,7 @@
     <string name="remove_sound">Remove</string>
     <string name="lock_screen_alert">Show on lock screen</string>
     <string name="override_silent_dnd">Play in silent / DND</string>
+    <string name="warn_on_battery">Warn only on battery</string>
     <string name="label_bg_color">Background</string>
     <string name="label_fg_color">Text</string>
     <string name="label_colors">Colors</string>
@@ -45,8 +46,7 @@
     <string name="alert_name_default">Battery low</string>
     <string name="alert_message_format">%1$s: %2$d%%</string>
 
-    <!-- Global settings -->
-    <string name="warn_on_battery">Warn only on battery</string>
+    <!-- Save button -->
     <string name="save_settings">Save</string>
 
     <!-- Validation errors -->

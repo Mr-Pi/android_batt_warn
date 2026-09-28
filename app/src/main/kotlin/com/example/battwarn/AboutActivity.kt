@@ -4,6 +4,10 @@ package com.example.battwarn
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.battwarn.databinding.ActivityAboutBinding
 
 /**
@@ -20,6 +24,22 @@ class AboutActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityAboutBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Match MainActivity's edge-to-edge handling so the license text is not
+        // drawn under the status bar or the app bar (enforced on API 35).
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        supportActionBar?.title = getString(R.string.about_title)
+        val insetsController = WindowInsetsControllerCompat(window, binding.root)
+        val darkMode = (resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        insetsController.isAppearanceLightStatusBars = !darkMode
+        insetsController.isAppearanceLightNavigationBars = !darkMode
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(0, bars.top, 0, bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
 
         binding.aboutVersion.text = getString(
             R.string.about_version,
