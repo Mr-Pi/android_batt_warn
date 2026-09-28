@@ -430,6 +430,10 @@ class MainActivity : AppCompatActivity() {
             fgColor = threshold.fgColor
             updateSoundLabel()
             refreshSwatchStrips()
+            // The swatch strips refresh the selection rings; the sample banner
+            // must also pick up the loaded colors (setText above already
+            // fired updatePreview with the defaults).
+            updatePreview()
         }
 
         fun updateSoundLabel() {

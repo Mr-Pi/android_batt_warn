@@ -209,6 +209,39 @@ class MainActivityTest {
         }
     }
 
+    @Test
+    fun preview_reflectsPickedColorsAfterReopen() {
+        // Pick a non-default background and text on the top row, then save.
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val row = rowAt(activity, 0)
+                row.findViewById<ViewGroup>(R.id.bg_swatch_strip)
+                    .getChildAt(5).performClick() // blue
+                row.findViewById<ViewGroup>(R.id.fg_swatch_strip)
+                    .getChildAt(10).performClick() // black
+                activity.findViewById<Button>(R.id.save_button).performClick()
+            }
+        }
+
+        // Reopen the settings: the sample banner must keep the picked colors
+        // instead of falling back to the default white-on-red.
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val preview = rowAt(activity, 0).findViewById<TextView>(R.id.preview_text)
+                assertEquals(
+                    "sample background must survive a reopen",
+                    ALERT_PALETTE[5],
+                    preview.backgroundTintList!!.defaultColor
+                )
+                assertEquals(
+                    "sample text must survive a reopen",
+                    ALERT_PALETTE[10],
+                    preview.currentTextColor
+                )
+            }
+        }
+    }
+
     private fun threshold(level: Int): AlertThreshold =
         AppSettings.DEFAULT_NEW_THRESHOLD.copy(level = level)
 
