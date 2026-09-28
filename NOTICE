@@ -7,11 +7,25 @@ top-level source directory for the full license text.
 Third-party notices
 -------------------
 
-The release APK bundles Android libraries that remain under their own
-licenses:
+The release APK bundles the libraries below, each of which remains under its
+own license. Every bundled artifact is licensed under the Apache License,
+Version 2.0 (the full text ships with the app as
+LICENSES/Apache-2.0.txt).
 
-- AndroidX (androidx.core:core-ktx 1.15.0, androidx.appcompat:appcompat 1.7.0,
-  androidx.constraintlayout:constraintlayout 2.2.0)
+- AndroidX — the app's four direct dependencies and the transitive AndroidX
+  artifacts they pull in:
+  - androidx.core:core-ktx 1.15.0
+  - androidx.appcompat:appcompat 1.7.0
+  - androidx.constraintlayout:constraintlayout 2.2.0
+  - androidx.databinding:viewbinding 8.10.1 (view binding runtime)
+  - and their transitive dependencies (androidx.activity, appcompat-resources,
+    arch.core, cardview, collection, concurrent-futures, coordinatorlayout,
+    core, cursoradapter, customview, documentfile, drawerlayout,
+    dynamicanimation, emoji2, fragment, interpolator, legacy-support-core-utils,
+    lifecycle-*, loader, localbroadcastmanager, print, profileinstaller,
+    recyclerview, resourceinspection, savedstate, startup-runtime, tracing,
+    transition, vectordrawable, versionedparcelable, viewpager, viewpager2,
+    annotation-*)
   Copyright (c) The Android Open Source Project
   Licensed under the Apache License, Version 2.0.
   https://developer.android.com/jetpack/androidx
@@ -20,6 +34,34 @@ licenses:
   Copyright (c) The Android Open Source Project
   Licensed under the Apache License, Version 2.0.
   https://github.com/material-components/material-components-android
+
+- Kotlin standard library (org.jetbrains.kotlin:kotlin-stdlib 2.2.21 and its
+  kotlin-stdlib-common / -jdk7 / -jdk8 modules)
+  Copyright (c) JetBrains s.r.o. and Kotlin Programming Language contributors
+  Licensed under the Apache License, Version 2.0.
+  https://github.com/JetBrains/kotlin
+
+- Kotlin Coroutines (org.jetbrains.kotlinx:kotlinx-coroutines-android and
+  kotlinx-coroutines-core 1.6.4)
+  Copyright (c) 2016-2021 JetBrains s.r.o.
+  Licensed under the Apache License, Version 2.0.
+  https://github.com/Kotlin/kotlinx.coroutines
+
+- Guava listenablefuture (com.google.guava:listenablefuture 1.0)
+  Copyright (c) The Guava Authors
+  Licensed under the Apache License, Version 2.0.
+  https://github.com/google/guava
+
+- Error Prone annotations (com.google.errorprone:error_prone_annotations
+  2.15.0)
+  Copyright (c) Google LLC
+  Licensed under the Apache License, Version 2.0.
+  https://github.com/google/error-prone
+
+- JetBrains annotations (org.jetbrains:annotations 13.0)
+  Copyright (c) JetBrains s.r.o.
+  Licensed under the Apache License, Version 2.0.
+  https://github.com/JetBrains/java-annotations
 
 Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
 

@@ -109,3 +109,15 @@ the boot receiver again until the app is manually opened.
 IDLE mode has no polling loop or scheduled alarm. The app listens for battery
 events and only starts the active cycle below the highest threshold. There are
 no network, GPS, or wake-lock operations.
+
+## About, licenses, and privacy
+
+The main screen's **About** button opens an in-app legal screen showing the app
+version, a privacy statement, the MIT license, the third-party notices for the
+bundled libraries, and the full Apache-2.0 license text. The texts are
+generated at build time from `LICENSE`, `NOTICE`, and
+`LICENSES/Apache-2.0.txt`, so each is maintained in exactly one place.
+
+The app collects, transmits, and shares no data. It declares no network
+permission: battery level is read only on the device, and settings stay in
+local storage.

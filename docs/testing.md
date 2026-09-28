@@ -30,6 +30,8 @@ afterward through `scripts/test-report.sh`, producing one status line per test.
 
 The emulator suite currently contains 51 tests across these classes:
 
+- `AboutActivityTest` — in-app legal screen renders the version, privacy
+  statement, MIT license, third-party notices, and the full Apache-2.0 text.
 - `AlertIntervalTest` — dismissal-based duration + quiet pause cycle.
 - `BatteryDropTest` — below-highest-threshold detection and the active tier's
   notification title.
@@ -55,7 +57,7 @@ The emulator suite currently contains 51 tests across these classes:
 
 The pure model logic (active-tier selection, JSON codec, color parsing) is also
 covered by JVM unit tests in `app/src/test` (`AlertThresholdTest`, 8 tests) —
-they run with `gradle testUnitTest` and need no emulator. The unit tests use
+they run with `gradle testDebugUnitTest` and need no emulator. The unit tests use
 the `org.json` artifact because the platform's JSON classes are not available on
 the plain JVM.
 

@@ -11,6 +11,7 @@
 | `AlertThreshold` | Data class for one tier (level, name, timings, sound, flags, colors), JSON codec, and pure selection helpers |
 | `OverlayAlert` | Bottom `TYPE_APPLICATION_OVERLAY` banner with auto/tap dismissal, tinted per threshold |
 | `LockScreenAlertActivity` | Full-screen `showWhenLocked` warning above the keyguard; auto/tap dismissal; colored per threshold |
+| `AboutActivity` | In-app legal screen: version, privacy statement, MIT license, third-party notices, and the full Apache-2.0 text |
 
 ## State flow
 
@@ -73,3 +74,21 @@ Intervals and durations accept values of one second or greater with no upper
 cap. Levels are clamped to 0–100, must be unique, and are stored sorted by
 level descending (most severe first). Colors are persisted as `#RRGGBB`
 strings and parsed by the pure `parseHexColor` helper.
+
+## Legal texts
+
+The app is MIT-licensed, and the About screen shows the legal texts inside the
+app. They are generated at build time, so each text has exactly one source in
+the repo:
+
+| Source | Generated raw resource | Shown as |
+| --- | --- | --- |
+| `LICENSE` | `mit_license.txt` | the app's MIT license |
+| `NOTICE` | `third_party_notices.txt` | third-party attributions |
+| `LICENSES/Apache-2.0.txt` | `apache_license_2_0.txt` | full Apache-2.0 text |
+
+The Gradle `generateLegalResources` task copies the three files into
+`build/generated/legal/res/raw`, which is added to the main resource set.
+`AboutActivity` reads them with `openRawResource`. Every bundled runtime library
+is Apache-2.0 (see `NOTICE`); build- and test-only dependencies are not
+distributed.

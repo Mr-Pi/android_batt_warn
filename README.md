@@ -18,16 +18,26 @@ alerts before the battery gets too low.
   sound, quiet interval, banner duration, lock-screen display, silent/DND
   override, background/text colors, and a per-threshold **Warn only on
   battery** mode that pauses alerts while charging.
-- Critical alerts can play a user-picked notification sound.
+- Every threshold can play a user-picked notification sound.
 - Floating bottom banner when “Display over other apps” is enabled.
 - Full-screen lock-screen warning (default on) while the display is already on.
 - Notification fallback with the current battery percentage.
-- Optional **Warn only on battery** mode (per threshold), which pauses that
-  tier's alerts while charging.
 - Starts after boot and package replacement.
-- Compact light/dark UI with live battery updates.
+- Compact light/dark UI with live battery updates, plus an in-app About screen
+  showing the license texts and privacy statement.
 
-More screenshots are available in [docs/screenshots](docs/screenshots/).
+Screenshots live in [docs/screenshots](docs/screenshots/): the main screen in
+light and dark mode, the low-battery state, the floating banner, the
+notification, the About/license screen, the lock-screen warning, and the color
+picker.
+
+<p align="center">
+  <img src="docs/screenshots/main-low.png" width="200" alt="Batt Warn monitoring a low battery">
+  <img src="docs/screenshots/notification.png" width="200" alt="Foreground-service battery notification">
+  <img src="docs/screenshots/about.png" width="200" alt="Batt Warn About screen with license and privacy texts">
+  <img src="docs/screenshots/lock-screen.png" width="200" alt="Full-screen low-battery warning over the lock screen">
+  <img src="docs/screenshots/color-picker.png" width="200" alt="Threshold color picker popup">
+</p>
 
 ## Quick start
 
@@ -111,7 +121,7 @@ other periodic background work.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 43 (plus 7 JVM unit tests)
+- Instrumented tests: 51 (plus 8 JVM unit tests)
 
 ## Documentation
 
@@ -127,10 +137,22 @@ shipped inside the APK; the rest are build/test-only.
 
 Runtime (bundled in the APK):
 
-- [androidx.core:core-ktx 1.15.0](https://developer.android.com/jetpack/androidx) — Apache-2.0
-- [androidx.appcompat:appcompat 1.7.0](https://developer.android.com/jetpack/androidx) — Apache-2.0
-- [com.google.android.material:material 1.12.0](https://github.com/material-components/material-components-android) — Apache-2.0
-- [androidx.constraintlayout:constraintlayout 2.2.0](https://developer.android.com/jetpack/androidx) — Apache-2.0
+- [AndroidX](https://developer.android.com/jetpack/androidx) — `androidx.core:core-ktx 1.15.0`,
+  `androidx.appcompat:appcompat 1.7.0`, `androidx.constraintlayout:constraintlayout 2.2.0`,
+  `androidx.databinding:viewbinding 8.10.1`, and their transitive AndroidX
+  dependencies — Apache-2.0
+- [Material Components for Android](https://github.com/material-components/material-components-android) —
+  `com.google.android.material:material 1.12.0` — Apache-2.0
+- [Kotlin standard library](https://github.com/JetBrains/kotlin) —
+  `org.jetbrains.kotlin:kotlin-stdlib 2.2.21` (and its common/jdk7/jdk8 modules) — Apache-2.0
+- [Kotlin Coroutines](https://github.com/Kotlin/kotlinx.coroutines) —
+  `org.jetbrains.kotlinx:kotlinx-coroutines-android` / `kotlinx-coroutines-core 1.6.4` — Apache-2.0
+- [Guava listenablefuture](https://github.com/google/guava) —
+  `com.google.guava:listenablefuture 1.0` — Apache-2.0
+- [Error Prone annotations](https://github.com/google/error-prone) —
+  `com.google.errorprone:error_prone_annotations 2.15.0` — Apache-2.0
+- [JetBrains annotations](https://github.com/JetBrains/java-annotations) —
+  `org.jetbrains:annotations 13.0` — Apache-2.0
 
 Build/test-only:
 

@@ -40,6 +40,7 @@ make devices      # adb devices
 make emulator     # boot headless API 35 emulator (AVD "test") if not running
 make test         # gradle connectedDebugAndroidTest + per-test PASS/FAIL summary
 make test-boot    # boot emulator (waits for boot) then run instrumented tests
+make screenshots  # capture/refresh docs/screenshots from a running emulator
 ```
 
 Direct Gradle options:
@@ -47,7 +48,7 @@ Direct Gradle options:
 ```
 gradle assembleDebug            # build debug APK
 gradle lintDebug                # Android Lint
-gradle testUnitTest             # JVM unit tests (threshold model, no emulator)
+gradle testDebugUnitTest        # JVM unit tests (threshold model, no emulator)
 gradle connectedDebugAndroidTest  # instrumented tests (emulator must be up)
 
 make test streams failures live while running and ends with a per-test
@@ -70,7 +71,8 @@ screen already on + overlay permission, activity renders the message/colors and
 auto-dismisses), the charging suppression (the active tier's
 warn-only-on-battery flag pauses or continues alerts while plugged in), the
 threshold-list settings (fresh 20%/9% baseline, JSON
-round-trip, add/load rows), and the main activity UI.
+round-trip, add/load rows), the main activity UI, and the in-app legal screen
+(version, privacy, MIT, third-party notices, Apache-2.0).
 
 ## Project layout
 
@@ -83,8 +85,10 @@ app/src/main/kotlin/com/example/battwarn/
   AlertThreshold.kt            # tier data class, JSON codec, selection helpers, color palette
   OverlayAlert.kt              # floating "always visible" alert banner (SYSTEM_ALERT_WINDOW)
   LockScreenAlertActivity.kt   # full-screen warning above the lock screen (showWhenLocked)
+  AboutActivity.kt             # in-app legal screen (version, privacy, MIT, notices, Apache-2.0)
 app/src/main/AndroidManifest.xml
 app/src/main/res/              # layout, strings, colors, theme, icons
+app/src/main/res/layout/activity_about.xml  # About screen layout
 app/src/androidTest/kotlin/com/example/battwarn/
   BootReceiverTest.kt          # autostart contract (manifest + receiver behavior)
   ServiceSmokeTest.kt          # FGS lifecycle + notification
@@ -95,10 +99,15 @@ app/src/androidTest/kotlin/com/example/battwarn/
   OverlayAlertTest.kt          # overlay permission + banner render/hide/dismiss callback
   OverrideSilentDndTest.kt     # per-threshold silent/DND override + UI round-trip
   LockScreenAlertTest.kt       # lock-screen gate, activity render/colors/auto-dismiss, UI round-trip
+  AboutActivityTest.kt         # in-app legal screen renders version, privacy, MIT, notices, Apache-2.0
 app/src/test/kotlin/com/example/battwarn/
   AlertThresholdTest.kt        # JVM unit tests: selection, JSON codec, colors (no emulator)
+LICENSE                        # MIT license text (single source for the in-app copy)
+NOTICE                         # third-party attributions + AI disclosure
+LICENSES/Apache-2.0.txt        # full Apache-2.0 text for the bundled libraries
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
+scripts/                       # test-report.sh, screenshots.sh
 README.md                      # project overview and quick start
 docs/                          # architecture, behavior, testing, screenshots
 ```
@@ -177,6 +186,12 @@ docs/                          # architecture, behavior, testing, screenshots
   codec and selection helpers are JVM-unit-testable. MainActivity keeps the
   in-memory edits per row until Save.
 - `viewBinding` is enabled; use it in new layouts.
+- The in-app legal texts are generated at build time (`generateLegalResources`
+  in `app/build.gradle.kts`) from the repo's `LICENSE`, `NOTICE`, and
+  `LICENSES/Apache-2.0.txt`, which are the single source of truth. Never copy
+  legal text into source or `res/`; edit the top-level files instead. When the
+  bundled dependencies change, update `NOTICE` (and the README list) to match
+  the release runtime classpath.
 - Every source file (Kotlin, XML, Gradle, shell, make) carries the SPDX header
   `// SPDX-FileCopyrightText: 2026 Batt Warn authors` and
   `// SPDX-License-Identifier: MIT` (XML uses `<!-- ... -->` comments; keep it
