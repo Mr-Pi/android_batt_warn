@@ -27,13 +27,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
-                android:hint="@string/label_level">
+                android:hint="@string/label_level"
+                app:expandedHintEnabled="false"
+                app:placeholderText="@string/placeholder_percent">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/level_field"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_percent"
                     android:inputType="number"
                     android:maxLines="1" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -45,13 +46,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
-                android:hint="@string/label_interval">
+                android:hint="@string/label_interval"
+                app:expandedHintEnabled="false"
+                app:placeholderText="@string/placeholder_seconds">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/interval_field"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_seconds"
                     android:inputType="number"
                     android:maxLines="1" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -62,13 +64,14 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="@string/label_duration">
+                android:hint="@string/label_duration"
+                app:expandedHintEnabled="false"
+                app:placeholderText="@string/placeholder_seconds">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/duration_field"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_seconds"
                     android:inputType="number"
                     android:maxLines="1" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -87,13 +90,14 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="@string/label_name">
+                android:hint="@string/label_name"
+                app:expandedHintEnabled="false"
+                app:placeholderText="@string/placeholder_name">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/name_field"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_name"
                     android:inputType="textCapSentences"
                     android:maxLines="1" />
             </com.google.android.material.textfield.TextInputLayout>

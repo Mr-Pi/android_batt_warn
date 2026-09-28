@@ -24,9 +24,9 @@
     <string name="label_interval">Interval s</string>
     <string name="label_duration">Duration s</string>
     <string name="label_name">Name</string>
-    <string name="hint_name">e.g. Battery low</string>
-    <string name="hint_percent">0–100</string>
-    <string name="hint_seconds">≥1</string>
+    <string name="placeholder_name">e.g. Battery low</string>
+    <string name="placeholder_percent">0–100</string>
+    <string name="placeholder_seconds">≥1</string>
     <string name="label_sound">Sound</string>
     <string name="sound_silent">Silent</string>
     <string name="pick_sound">Pick</string>

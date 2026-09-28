@@ -14,9 +14,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -237,6 +239,47 @@ class MainActivityTest {
                     "sample text must survive a reopen",
                     ALERT_PALETTE[10],
                     preview.currentTextColor
+                )
+            }
+        }
+    }
+
+    @Test
+    fun emptyFields_keepLabelAndPlaceholderSeparate() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val level = activity.findViewById<TextInputLayout>(R.id.level_layout)
+                val name = activity.findViewById<TextInputLayout>(R.id.name_layout)
+
+                // The label must never collapse into the field, otherwise it
+                // would stack on the placeholder shown in an empty input.
+                assertFalse("label must stay floated", level.isExpandedHintEnabled)
+                assertFalse("label must stay floated", name.isExpandedHintEnabled)
+
+                // The layout keeps the label; the placeholder is the only
+                // in-field text while the input is empty.
+                assertEquals(
+                    activity.getString(R.string.label_level),
+                    level.hint.toString()
+                )
+                assertEquals(
+                    "placeholder must be the in-field text when empty",
+                    activity.getString(R.string.placeholder_percent),
+                    level.placeholderText.toString()
+                )
+                assertEquals(
+                    "placeholder must be the in-field text when empty",
+                    activity.getString(R.string.placeholder_name),
+                    name.placeholderText.toString()
+                )
+
+                // The edit text must not draw a second hint on top of the
+                // placeholder (that caused the overlap on empty fields).
+                val field = level.findViewById<TextInputEditText>(R.id.level_field)
+                assertNotEquals(
+                    "edit text hint must not duplicate the placeholder",
+                    activity.getString(R.string.placeholder_percent),
+                    field.hint?.toString()
                 )
             }
         }
