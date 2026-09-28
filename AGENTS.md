@@ -170,8 +170,9 @@ docs/                          # architecture, behavior, testing, screenshots
   battery" checkbox, a "Play in silent / DND" checkbox (all three wrap onto
   as many lines as needed), and a color popup with preset background/text
   swatches shown as two side-by-side preview circles next to the sample
-  banner. Save validates, stores sorted by level descending, and restarts
-  the running service so new values apply immediately.
+  banner. Save validates, stores sorted by level descending, reloads the
+  rows in that sorted order, and restarts the running service so new values
+  apply immediately.
 - The tier model is in `AlertThreshold.kt` (pure Kotlin + org.json); the
   codec and selection helpers are JVM-unit-testable. MainActivity keeps the
   in-memory edits per row until Save.

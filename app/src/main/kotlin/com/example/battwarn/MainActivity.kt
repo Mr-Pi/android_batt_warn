@@ -282,6 +282,9 @@ class MainActivity : AppCompatActivity() {
                 Intent(this, BatteryMonitorService::class.java)
             )
         }
+        // Reload the rows from the stored list so the visible order matches
+        // the saved, level-descending sort.
+        renderRows()
         val highest = thresholds.maxOf { it.level }
         binding.statusText.text = getString(R.string.status_saved, highest)
     }

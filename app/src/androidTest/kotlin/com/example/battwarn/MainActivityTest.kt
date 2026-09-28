@@ -148,6 +148,41 @@ class MainActivityTest {
     }
 
     @Test
+    fun save_sortsRowsDescending() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                // Start from the 20/9 baseline; make the visible order
+                // deliberately unsorted: 10 on top, then a new 30 row.
+                val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+                val before = container.childCount
+                rowAt(activity, 0).findViewById<TextInputEditText>(R.id.level_field)
+                    .setText("10")
+                activity.findViewById<Button>(R.id.add_threshold_button).performClick()
+                rowAt(activity, before).findViewById<TextInputEditText>(R.id.level_field)
+                    .setText("30")
+                activity.findViewById<Button>(R.id.save_button).performClick()
+            }
+        }
+
+        // Reopening shows the stored order; assert the sorted levels match.
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+                val levels = (0 until container.childCount).map { index ->
+                    rowAt(activity, index)
+                        .findViewById<TextInputEditText>(R.id.level_field)
+                        .text.toString().toInt()
+                }
+                assertEquals(
+                    "saved list must be sorted by level descending",
+                    listOf(30, 10, 9),
+                    levels
+                )
+            }
+        }
+    }
+
+    @Test
     fun rows_loadSavedThresholds() {
         AppSettings.saveThresholds(
             context,
