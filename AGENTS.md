@@ -67,7 +67,9 @@ tap, never when the overlay cannot be shown), the per-threshold silent/DND
 override (alarm-stream attributes + plays in silent/vibrate with the setting
 on, blocked without), the lock-screen alert (default on; gate requires locked +
 screen already on + overlay permission, activity renders the message/colors and
-auto-dismisses), the threshold-list settings (fresh 20%/9% baseline, JSON
+auto-dismisses), the charging suppression (the active tier's
+warn-only-on-battery flag pauses or continues alerts while plugged in), the
+threshold-list settings (fresh 20%/9% baseline, JSON
 round-trip, add/load rows), and the main activity UI.
 
 ## Project layout
@@ -121,9 +123,10 @@ docs/                          # architecture, behavior, testing, screenshots
   - `sound_uri` (empty = silent) plays once per cycle; `override_silent_dnd`
     routes it to the alarm channel so it plays in silent/vibrate and typical
     DND.
-  - With `warn_only_on_battery` (default on), all warnings pause while the
-    device is plugged in (AC/USB/wireless) and resume on unplug — the
-    notification keeps showing the level with the monitoring title meanwhile.
+  - With the active tier's `warn_only_on_battery` flag (default on), that
+    tier's warnings pause while the device is plugged in (AC/USB/wireless) and
+    resume on unplug — the notification keeps showing the level with the
+    monitoring title meanwhile.
   - Exits when the level rises back above the highest threshold or on
     `ACTION_BATTERY_OKAY`.
 - The alert is a floating banner (OverlayAlert) tinted with the tier's colors
@@ -155,17 +158,20 @@ docs/                          # architecture, behavior, testing, screenshots
 - Settings live in `AppSettings` (SharedPreferences `battwarn_settings`):
   the `thresholds` JSON list (each entry: `level`, `name`, `intervalSec`,
   `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`,
-  `fgColor`) and `warn_only_on_battery` (default on; checkbox "Warn only on
-  battery" pauses alerts while charging). The fresh baseline is a 20% "Battery
-  low" tier and a 9% "Battery critical" tier, both silent, lock-screen on, red
-  background/white text. Legacy single keys are ignored (no migration).
-- Each threshold row: level (0-100, unique), optional name (shown before the
-  percentage and as the notification title; blank falls back to "Battery
-  low"), interval/duration ≥ 1s with no upper cap, a picked tone (empty =
-  silent; per-row Remove sound button), a "Show on lock screen" checkbox, a
-  "Play in silent / DND" checkbox, and preset background/text swatches. Save
-  validates, stores sorted by level descending, and restarts the running
-  service so new values apply immediately.
+  `fgColor`, `warnOnlyOnBattery`). The fresh baseline is a 20% "Battery
+  low" tier and a 9% "Battery critical" tier, both silent, lock-screen on,
+  warn-only-on-battery on, red background/white text. Legacy single keys are
+  ignored (no migration).
+- Each threshold row (name field first, then level/interval/duration):
+  level (0-100, unique), optional name (shown before the percentage and as
+  the notification title; blank falls back to "Battery low"), interval/
+  duration ≥ 1s with no upper cap, a picked tone (empty = silent; per-row
+  Remove sound button), a "Show on lock screen" checkbox, a "Warn only on
+  battery" checkbox, a "Play in silent / DND" checkbox (all three wrap onto
+  as many lines as needed), and a color popup with preset background/text
+  swatches shown as two side-by-side preview circles next to the sample
+  banner. Save validates, stores sorted by level descending, and restarts
+  the running service so new values apply immediately.
 - The tier model is in `AlertThreshold.kt` (pure Kotlin + org.json); the
   codec and selection helpers are JVM-unit-testable. MainActivity keeps the
   in-memory edits per row until Save.

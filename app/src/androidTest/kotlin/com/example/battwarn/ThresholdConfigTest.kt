@@ -43,6 +43,7 @@ class ThresholdConfigTest {
         assertEquals("Battery critical", defaults[1].name)
         assertTrue("both defaults show on the lock screen", defaults.all { it.lockScreen })
         assertTrue("both defaults honor silent/DND", defaults.all { !it.overrideSilentDnd })
+        assertTrue("both defaults warn only on battery", defaults.all { it.warnOnlyOnBattery })
         assertEquals(DEFAULT_BG_COLOR, defaults[0].bgColor)
         assertEquals(DEFAULT_FG_COLOR, defaults[0].fgColor)
     }
@@ -61,7 +62,8 @@ class ThresholdConfigTest {
                 name = "",
                 soundUri = "content://settings/system/notification_sound",
                 lockScreen = false,
-                overrideSilentDnd = true
+                overrideSilentDnd = true,
+                warnOnlyOnBattery = false
             ),
         )
         AppSettings.saveThresholds(context, list)

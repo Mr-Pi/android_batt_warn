@@ -8,6 +8,8 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.ParcelFileDescriptor
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ActivityScenario
@@ -23,9 +25,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Verifies the "Warn only on battery" setting: with it on, charging (AC/
- * USB/wireless) pauses all warnings; unplugging resumes them below the
- * threshold; with it off, warnings continue while charging.
+ * Verifies the per-threshold "Warn only on battery" flag: the active tier
+ * decides. With the flag on, charging (AC/USB/wireless) pauses all warnings;
+ * unplugging resumes them below the threshold; with it off, warnings continue
+ * while charging. A higher tier with the flag off still warns while charging
+ * above a lower tier that has it on.
  */
 @RunWith(AndroidJUnit4::class)
 class ChargingTest {
@@ -56,7 +60,7 @@ class ChargingTest {
         // time to prove the banner never appears while charging.
         Thread.sleep(10_000)
         assertTrue(
-            "banner must not show while charging (setting on)",
+            "banner must not show while charging (flag on)",
             BatteryMonitorService.bannerShows == before
         )
         assertEquals(
@@ -96,8 +100,52 @@ class ChargingTest {
         val before = BatteryMonitorService.bannerShows
         startService()
         assertTrue(
-            "banner must show while charging (setting off)",
+            "banner must show while charging (flag off)",
             await(10_000) { BatteryMonitorService.bannerShows > before }
+        )
+    }
+
+    @Test
+    fun chargingSuppression_followsActiveTier() {
+        // 60% tier warns while charging; the 50% tier (below 50%) does not.
+        AppSettings.saveThresholds(
+            context,
+            listOf(
+                AppSettings.DEFAULT_NEW_THRESHOLD.copy(
+                    level = 60, name = "Sixty", intervalSec = 5, durationSec = 1,
+                    lockScreen = false, warnOnlyOnBattery = false
+                ),
+                AppSettings.DEFAULT_NEW_THRESHOLD.copy(
+                    level = 50, name = "Fifty", intervalSec = 5, durationSec = 1,
+                    lockScreen = false, warnOnlyOnBattery = true
+                ),
+            )
+        )
+        shell("dumpsys battery set ac 1")
+        shell("dumpsys battery set level 55")
+
+        val before = BatteryMonitorService.bannerShows
+        startService()
+        assertTrue(
+            "warns while charging when the active tier allows it",
+            await(10_000) { BatteryMonitorService.bannerShows > before }
+        )
+
+        // Below 50% the 50% tier (flag on) becomes active: suppress.
+        val mid = BatteryMonitorService.bannerShows
+        shell("dumpsys battery set level 45")
+        Thread.sleep(3_000)
+        assertEquals(
+            "charging + active tier warn-only must suppress",
+            mid,
+            BatteryMonitorService.bannerShows
+        )
+
+        // Back above 50% the 60% tier (flag off) resumes.
+        shell("dumpsys battery set level 55")
+        assertTrue(
+            "warns again once the allowed tier is active",
+            await(10_000) { BatteryMonitorService.bannerShows > mid }
         )
     }
 
@@ -105,37 +153,37 @@ class ChargingTest {
     fun warnOnlyOnBattery_roundTripsThroughSave() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val check = activity.findViewById<MaterialCheckBox>(R.id.warn_on_battery_check)
-                assertTrue("must start checked with the setting on by default", check.isChecked)
+                val check = rowAt(activity, 0)
+                    .findViewById<MaterialCheckBox>(R.id.warn_on_battery_check)
+                assertTrue("must start checked with the flag on by default", check.isChecked)
 
                 check.performClick()
                 activity.findViewById<Button>(R.id.save_button).performClick()
             }
         }
         assertFalse(
-            "saving must persist the unchecked warn-only setting",
-            AppSettings.warnOnlyOnBattery(context)
+            "saving must persist the unchecked warn-only flag",
+            AppSettings.thresholds(context).first().warnOnlyOnBattery
         )
     }
 
     @Test
     fun warnOnlyOnBattery_loadsSavedValue() {
-        AppSettings.prefs(context).edit()
-            .putBoolean(AppSettings.KEY_WARN_ONLY_ON_BATTERY, false)
-            .commit()
+        AppSettings.saveThresholds(
+            context,
+            listOf(AppSettings.DEFAULT_NEW_THRESHOLD.copy(warnOnlyOnBattery = false))
+        )
 
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val check = activity.findViewById<MaterialCheckBox>(R.id.warn_on_battery_check)
+                val check = rowAt(activity, 0)
+                    .findViewById<MaterialCheckBox>(R.id.warn_on_battery_check)
                 assertFalse("saved (off) value must be reflected on load", check.isChecked)
             }
         }
     }
 
     private fun setPrefs(warnOnlyOnBattery: Boolean) {
-        AppSettings.prefs(context).edit()
-            .putBoolean(AppSettings.KEY_WARN_ONLY_ON_BATTERY, warnOnlyOnBattery)
-            .commit()
         AppSettings.saveThresholds(
             context,
             listOf(
@@ -144,10 +192,16 @@ class ChargingTest {
                     name = "Battery low",
                     intervalSec = 5,
                     durationSec = 1,
-                    lockScreen = false
+                    lockScreen = false,
+                    warnOnlyOnBattery = warnOnlyOnBattery
                 )
             )
         )
+    }
+
+    private fun rowAt(activity: MainActivity, index: Int): View {
+        val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+        return container.getChildAt(index)
     }
 
     private fun startService() {

@@ -3,16 +3,19 @@
 package com.example.battwarn
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
 import android.os.ParcelFileDescriptor
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.GridLayout
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.core.view.WindowInsetsControllerCompat
+import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import org.junit.After
@@ -175,6 +178,7 @@ class MainActivityTest {
                 row.findViewById<TextInputEditText>(R.id.name_field).setText("Urgent")
                 row.findViewById<TextInputEditText>(R.id.interval_field).setText("42")
                 row.findViewById<TextInputEditText>(R.id.duration_field).setText("7")
+                row.findViewById<MaterialCheckBox>(R.id.warn_on_battery_check).performClick()
                 activity.findViewById<Button>(R.id.save_button).performClick()
             }
         }
@@ -182,6 +186,7 @@ class MainActivityTest {
         assertEquals("edited name must persist", "Urgent", stored.name)
         assertEquals("edited interval must persist", 42, stored.intervalSec)
         assertEquals("edited duration must persist", 7, stored.durationSec)
+        assertFalse("edited warn-only flag must persist", stored.warnOnlyOnBattery)
     }
 
     @Test
@@ -230,23 +235,29 @@ class MainActivityTest {
 
     @Test
     fun preview_reflectsPickedColorsAfterReopen() {
-        // Pick a non-default background and text on the top row, then save.
+        // Pick a non-default background and text on the top row via the color
+        // picker dialogs, then save.
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val row = rowAt(activity, 0)
-                row.findViewById<ViewGroup>(R.id.bg_swatch_strip)
-                    .getChildAt(5).performClick() // blue
-                row.findViewById<ViewGroup>(R.id.fg_swatch_strip)
-                    .getChildAt(10).performClick() // black
+                rowAt(activity, 0).findViewById<View>(R.id.bg_color_swatch).performClick()
+            }
+            pickColorFromDialog(scenario, 5) // blue background
+            scenario.onActivity { activity ->
+                rowAt(activity, 0).findViewById<View>(R.id.fg_color_swatch).performClick()
+            }
+            pickColorFromDialog(scenario, 10) // black text
+            scenario.onActivity { activity ->
                 activity.findViewById<Button>(R.id.save_button).performClick()
             }
         }
 
         // Reopen the settings: the sample banner must keep the picked colors
-        // instead of falling back to the default white-on-red.
+        // instead of falling back to the default white-on-red, and the
+        // side-by-side preview swatches must show them.
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val preview = rowAt(activity, 0).findViewById<TextView>(R.id.preview_text)
+                val row = rowAt(activity, 0)
+                val preview = row.findViewById<TextView>(R.id.preview_text)
                 assertEquals(
                     "sample background must survive a reopen",
                     ALERT_PALETTE[5],
@@ -256,6 +267,19 @@ class MainActivityTest {
                     "sample text must survive a reopen",
                     ALERT_PALETTE[10],
                     preview.currentTextColor
+                )
+
+                val bgSwatch = row.findViewById<View>(R.id.bg_color_swatch)
+                val fgSwatch = row.findViewById<View>(R.id.fg_color_swatch)
+                assertEquals(
+                    "bg preview swatch must show the picked color",
+                    ALERT_PALETTE[5],
+                    (bgSwatch.background as GradientDrawable).color!!.defaultColor
+                )
+                assertEquals(
+                    "fg preview swatch must show the picked color",
+                    ALERT_PALETTE[10],
+                    (fgSwatch.background as GradientDrawable).color!!.defaultColor
                 )
             }
         }
@@ -304,6 +328,20 @@ class MainActivityTest {
 
     private fun threshold(level: Int): AlertThreshold =
         AppSettings.DEFAULT_NEW_THRESHOLD.copy(level = level)
+
+    /** Taps the palette swatch at [index] inside the open color dialog. */
+    private fun pickColorFromDialog(scenario: ActivityScenario<MainActivity>, index: Int) {
+        scenario.onActivity { activity ->
+            val dialog = activity.currentColorDialog
+                ?: throw AssertionError("color picker dialog not shown")
+            val grid = dialog.findViewById<GridLayout>(R.id.color_picker_grid)!!
+            assertTrue(
+                "picker grid must hold all palette swatches",
+                grid.childCount == ALERT_PALETTE.size
+            )
+            grid.getChildAt(index).performClick()
+        }
+    }
 
     private fun rowAt(activity: MainActivity, index: Int): View {
         val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)

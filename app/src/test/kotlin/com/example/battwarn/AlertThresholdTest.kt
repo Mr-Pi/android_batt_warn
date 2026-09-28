@@ -85,4 +85,28 @@ class AlertThresholdTest {
         assertEquals(0, parseHexColor("garbage", 0))
         assertEquals(0, parseHexColor("", 0))
     }
+
+    @Test
+    fun warnOnlyOnBattery_defaultsOnAndSurvivesRoundTrip() {
+        assertTrue("warn-only must default on", low.warnOnlyOnBattery)
+
+        val off = low.copy(warnOnlyOnBattery = false)
+        assertEquals(off, decodeThresholds(encodeThresholds(listOf(off))).single())
+        assertEquals(false, decodeThresholds(encodeThresholds(listOf(off))).single().warnOnlyOnBattery)
+
+        // Legacy JSON without the key must decode to the ON default.
+        val legacy = org.json.JSONObject().apply {
+            put("level", 20)
+            put("name", "Battery low")
+            put("intervalSec", 25)
+            put("durationSec", 5)
+            put("soundUri", "")
+            put("lockScreen", true)
+            put("overrideSilentDnd", false)
+            put("bgColor", "#D32F2F")
+            put("fgColor", "#FFFFFF")
+        }
+        val decoded = decodeThresholds(org.json.JSONArray().put(legacy).toString()).single()
+        assertEquals("missing key must decode to the ON default", true, decoded.warnOnlyOnBattery)
+    }
 }

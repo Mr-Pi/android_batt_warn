@@ -36,12 +36,16 @@ that pause immediately.
 
 ## Charging
 
-**Warn only on battery** is enabled by default. When the device is plugged into
-AC, USB, or wireless power, all banners/sounds stop. The notification still
-shows the live battery level and uses the monitoring title. Unplugging while
-still below a threshold resumes the first alert immediately.
+Each threshold carries its own **Warn only on battery** flag (default on). The
+**active** tier's flag decides: while plugged into AC, USB, or wireless power,
+the active tier's banners/sounds stop when its flag is on. The notification
+still shows the live battery level and uses the monitoring title. Unplugging
+while still below a threshold resumes the first alert immediately.
 
-Turning the setting off allows warnings while charging.
+Because only the active tier governs, a threshold with the flag off keeps
+warning while charging — for example, a 60% tier with the flag off warns from
+60% down to 50%, while a 50% tier with the flag on silences the alerts below
+50% while charging.
 
 ## Alert sound
 
@@ -57,11 +61,13 @@ is a DND rule configured to silence alarms as well.
 
 ## Colors
 
-Each threshold's background and text colors are chosen from a preset palette.
-They tint the bottom banner (the rounded background and the message text) and
-the full-screen lock-screen alert. The foreground notification itself is not
-colored, and the main screen's battery number keeps its green/red rule based on
-the highest threshold.
+Each threshold's background and text colors are chosen from a preset palette
+shown in a small popup; two side-by-side preview circles in the row always
+show the currently selected pair. The colors tint the bottom banner (the
+rounded background and the message text) and the full-screen lock-screen
+alert. The foreground notification itself is not colored, and the main
+screen's battery number keeps its green/red rule based on the highest
+threshold.
 
 ## Overlay and notification fallback
 

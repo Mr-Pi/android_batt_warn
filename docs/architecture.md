@@ -19,7 +19,7 @@ stateDiagram-v2
     [*] --> IDLE
     IDLE --> ACTIVE: battery changed below highest threshold
     ACTIVE --> IDLE: level reaches highest threshold or ACTION_BATTERY_OKAY
-    ACTIVE --> IDLE: charging + Warn only on battery
+    ACTIVE --> IDLE: charging + active tier's Warn only on battery
 ```
 
 While ACTIVE, the tier is selected on every cycle:
@@ -62,13 +62,12 @@ Settings are stored in `battwarn_settings`:
 
 | Key | Default | Meaning |
 | --- | ---: | --- |
-| `thresholds` | 20%/9% baseline | JSON list of user thresholds; each has `level`, `name`, `intervalSec`, `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`, `fgColor` |
-| `warn_only_on_battery` | true | Suppress warnings while AC/USB/wireless charging |
+| `thresholds` | 20%/9% baseline | JSON list of user thresholds; each has `level`, `name`, `intervalSec`, `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`, `fgColor`, `warnOnlyOnBattery` |
 
 The fresh-install baseline is a 20% "Battery low" tier and a 9% "Battery
-critical" tier, both silent, with lock-screen display on and the default red
-background/white text. Legacy single-key settings are ignored (no migration);
-when the stored list is empty the baseline is returned.
+critical" tier, both silent, with lock-screen display on, warn-only-on-battery
+on, and the default red background/white text. Legacy single-key settings are
+ignored (no migration); when the stored list is empty the baseline is returned.
 
 Intervals and durations accept values of one second or greater with no upper
 cap. Levels are clamped to 0–100, must be unique, and are stored sorted by

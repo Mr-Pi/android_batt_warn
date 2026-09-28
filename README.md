@@ -16,12 +16,14 @@ alerts before the battery gets too low.
 - Event-driven battery monitoring with no idle polling.
 - User-configurable list of thresholds; each threshold has its own level, name,
   sound, quiet interval, banner duration, lock-screen display, silent/DND
-  override, and background/text colors.
+  override, background/text colors, and a per-threshold **Warn only on
+  battery** mode that pauses alerts while charging.
 - Critical alerts can play a user-picked notification sound.
 - Floating bottom banner when “Display over other apps” is enabled.
 - Full-screen lock-screen warning (default on) while the display is already on.
 - Notification fallback with the current battery percentage.
-- Optional **Warn only on battery** mode, which pauses alerts while charging.
+- Optional **Warn only on battery** mode (per threshold), which pauses that
+  tier's alerts while charging.
 - Starts after boot and package replacement.
 - Compact light/dark UI with live battery updates.
 
@@ -88,8 +90,10 @@ notification remains the surface. The platform only allows the background
 service to raise that full-screen activity because the overlay permission is
 granted.
 
-Warnings pause while charging when **Warn only on battery** is enabled. The
-foreground notification continues to show the current level while charging.
+The **active** threshold's **Warn only on battery** flag decides whether
+warnings pause while charging, so each tier can warn (or stay silent) while
+plugged in. The foreground notification continues to show the current level
+while charging.
 
 See [docs/behavior.md](docs/behavior.md) and [docs/architecture.md](docs/architecture.md)
 for details.

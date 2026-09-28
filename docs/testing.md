@@ -28,14 +28,15 @@ afterward through `scripts/test-report.sh`, producing one status line per test.
 
 ## Test coverage
 
-The emulator suite currently contains 49 tests across these classes:
+The emulator suite currently contains 50 tests across these classes:
 
 - `AlertIntervalTest` — dismissal-based duration + quiet pause cycle.
 - `BatteryDropTest` — below-highest-threshold detection and the active tier's
   notification title.
 - `BootReceiverTest` — manifest contract and real boot/package-replace starts.
 - `ChargingTest` — pause while charging, resume on unplug, opt-out behavior,
-  and the "Warn only on battery" checkbox round-trip + load.
+  active-tier-decides suppression across two thresholds, and the per-threshold
+  "Warn only on battery" checkbox round-trip + load.
 - `LockScreenAlertTest` — lock-screen gate, activity render/colors/auto-dismiss,
   UI round-trip.
 - `MainActivityTest` — compact UI, live battery level, add/load threshold rows,
@@ -52,7 +53,7 @@ The emulator suite currently contains 49 tests across these classes:
   selection helper.
 
 The pure model logic (active-tier selection, JSON codec, color parsing) is also
-covered by JVM unit tests in `app/src/test` (`AlertThresholdTest`, 7 tests) —
+covered by JVM unit tests in `app/src/test` (`AlertThresholdTest`, 8 tests) —
 they run with `gradle testUnitTest` and need no emulator. The unit tests use
 the `org.json` artifact because the platform's JSON classes are not available on
 the plain JVM.

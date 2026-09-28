@@ -35,6 +35,10 @@
     <string name="override_silent_dnd">Play in silent / DND</string>
     <string name="label_bg_color">Background</string>
     <string name="label_fg_color">Text</string>
+    <string name="label_colors">Colors</string>
+    <string name="color_bg_desc">Background color</string>
+    <string name="color_fg_desc">Text color</string>
+    <string name="color_picker_title">Pick %1$s</string>
     <string name="color_swatch_desc">Color swatch</string>
 
     <!-- Alert message -->
@@ -43,7 +47,6 @@
 
     <!-- Global settings -->
     <string name="warn_on_battery">Warn only on battery</string>
-    <string name="note_warn_on_battery">Alerts pause while charging.</string>
     <string name="save_settings">Save</string>
 
     <!-- Validation errors -->

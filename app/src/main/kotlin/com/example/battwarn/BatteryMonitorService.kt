@@ -37,15 +37,16 @@ import androidx.core.content.ContextCompat
  *
  * ACTIVE mode picks the active tier with [activeThreshold] — the threshold with
  * the smallest level the current level is strictly below. That tier's timings,
- * sound, DND override, lock-screen flag, and colors drive the alert. Each
- * banner stays up for the tier's duration; the NEXT banner is shown interval
- * seconds AFTER the banner closes — measured from the dismissal (auto-dismiss
- * or tap), so the interval is a quiet pause between alerts. Without overlay
- * permission there is no banner and thus no dismissal event; the next cycle is
- * then scheduled interval after the previous one started. While the device is
- * locked and the display is already on, the alert is shown full-screen over
- * the lock screen by [LockScreenAlertActivity] instead of the overlay (see
- * [shouldShowOnLockScreen]); the screen is never woken.
+ * sound, DND override, lock-screen flag, warn-only-on-battery flag, and colors
+ * drive the alert. Each banner stays up for the tier's duration; the NEXT banner
+ * is shown interval seconds AFTER the banner closes — measured from the
+ * dismissal (auto-dismiss or tap), so the interval is a quiet pause between
+ * alerts. Without overlay permission there is no banner and thus no dismissal
+ * event; the next cycle is then scheduled interval after the previous one
+ * started. While the device is locked and the display is already on, the alert
+ * is shown full-screen over the lock screen by [LockScreenAlertActivity]
+ * instead of the overlay (see [shouldShowOnLockScreen]); the screen is never
+ * woken.
  * The FGS notification is refreshed on every battery change (in both IDLE and
  * ACTIVE) so it always reflects the current level and the active tier's name.
  * Polling stops when the battery rises back above the highest threshold or on
@@ -83,8 +84,9 @@ class BatteryMonitorService : Service() {
         override fun run() {
             val level = currentBatteryLevel()
             val threshold = activeThreshold(level, AppSettings.thresholds(this@BatteryMonitorService))
-            updateNotification(level, threshold)
-            if (threshold != null) {
+            val suppressed = isChargingNow() && threshold?.warnOnlyOnBattery == true
+            updateNotification(level, threshold, suppressed)
+            if (threshold != null && !suppressed) {
                 showLowBatteryAlert(level, threshold)
             } else {
                 stopPolling()
@@ -96,8 +98,9 @@ class BatteryMonitorService : Service() {
         createNotificationChannel()
         val thresholds = AppSettings.thresholds(this)
         val level = currentBatteryLevel()
-        val suppressed = isChargingNow() && AppSettings.warnOnlyOnBattery(this)
-        startForeground(NOTIFICATION_ID, buildNotification(level, activeThreshold(level, thresholds), suppressed))
+        val threshold = activeThreshold(level, thresholds)
+        val suppressed = isChargingNow() && threshold?.warnOnlyOnBattery == true
+        startForeground(NOTIFICATION_ID, buildNotification(level, threshold, suppressed))
         registerBatteryActions()
         registerLockAlertDismissReceiver()
         val highest = highestThreshold(thresholds)
@@ -172,11 +175,11 @@ class BatteryMonitorService : Service() {
     private fun onBatteryChanged(intent: Intent?) {
         val level = levelFrom(intent)
         val threshold = activeThreshold(level, AppSettings.thresholds(this))
-        val suppressed = isChargingNow() && AppSettings.warnOnlyOnBattery(this)
+        val suppressed = isChargingNow() && threshold?.warnOnlyOnBattery == true
         updateNotification(level, threshold, suppressed)
         when {
-            // Charging with the setting on: pause — also cancels a pending
-            // post-dismiss poll from an already-running cycle.
+            // Charging with the active tier's warn-only flag on: pause — also
+            // cancels a pending post-dismiss poll from an already-running cycle.
             suppressed -> stopPolling()
             threshold != null -> startPolling()
             else -> stopPolling()

@@ -22,8 +22,10 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
+import android.widget.GridLayout
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.VisibleForTesting
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -33,12 +35,18 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.battwarn.databinding.ActivityMainBinding
 import com.example.battwarn.databinding.ItemThresholdBinding
 import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val rows = mutableListOf<ThresholdRow>()
     private var pendingSoundRow: ThresholdRow? = null
+
+    // The open color picker dialog (null while none is showing), so the
+    // instrumentation tests can interact with it directly.
+    @VisibleForTesting
+    internal var currentColorDialog: AlertDialog? = null
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -155,7 +163,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadSettingsIntoFields() {
-        binding.warnOnBatteryCheck.isChecked = AppSettings.warnOnlyOnBattery(this)
         renderRows()
     }
 
@@ -258,6 +265,7 @@ class MainActivity : AppCompatActivity() {
                     overrideSilentDnd = row.binding.dndCheck.isChecked,
                     bgColor = row.bgColor,
                     fgColor = row.fgColor,
+                    warnOnlyOnBattery = row.binding.warnOnBatteryCheck.isChecked,
                 )
             }
         }
@@ -265,7 +273,6 @@ class MainActivity : AppCompatActivity() {
         if (!valid || thresholds.isEmpty()) return
 
         AppSettings.saveThresholds(this, thresholds)
-        AppSettings.saveWarnOnlyOnBattery(this, binding.warnOnBatteryCheck.isChecked)
 
         // Restart so the running service applies the new values immediately.
         if (BatteryMonitorService.isRunning) {
@@ -359,31 +366,59 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Builds the swatch strip for one color slot and wires selection. */
-    private fun buildSwatchStrip(strip: LinearLayout, current: Int, onPick: (Int) -> Unit) {
-        strip.removeAllViews()
+    /** Draws one circular color swatch; [selected] draws a contrast ring. */
+    private fun swatchDrawable(color: Int, selected: Boolean): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(color)
+            setStroke(
+                if (selected) dp(3) else dp(1),
+                if (isLightColor(color)) Color.BLACK else Color.WHITE
+            )
+        }
+
+    /** Builds the palette grid used by the color picker dialog. */
+    private fun buildColorPicker(current: Int, onPick: (Int) -> Unit): View {
+        val grid = layoutInflater.inflate(
+            R.layout.dialog_color_picker,
+            null
+        ) as GridLayout
         ALERT_PALETTE.forEach { color ->
             val swatch = View(this).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(34), dp(34)).apply {
-                    marginEnd = dp(6)
+                layoutParams = GridLayout.LayoutParams().apply {
+                    width = dp(44)
+                    height = dp(44)
+                    setMargins(dp(6), dp(6), dp(6), dp(6))
                 }
                 background = swatchDrawable(color, color == current)
                 contentDescription = getString(R.string.color_swatch_desc)
                 setOnClickListener { onPick(color) }
             }
-            strip.addView(swatch)
+            grid.addView(swatch)
         }
+        return grid
     }
 
-    private fun swatchDrawable(color: Int, selected: Boolean): GradientDrawable =
-        GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(color)
-            if (selected) {
-                val strokeColor = if (isLightColor(color)) Color.BLACK else Color.WHITE
-                setStroke(dp(3), strokeColor)
-            }
-        }
+    /** Opens the palette dialog for one color slot of the given row. */
+    private fun showColorPicker(row: ThresholdRow, isBackground: Boolean) {
+        val slotLabel = getString(
+            if (isBackground) R.string.label_bg_color else R.string.label_fg_color
+        )
+        val current = if (isBackground) row.bgColor else row.fgColor
+        lateinit var dialog: AlertDialog
+        dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.color_picker_title, slotLabel))
+            .setView(buildColorPicker(current) { color ->
+                if (isBackground) row.bgColor = color else row.fgColor = color
+                row.refreshColorPreviews()
+                row.updatePreview()
+                dialog.dismiss()
+            })
+            .setNegativeButton(android.R.string.cancel) { d, _ -> d.dismiss() }
+            .show()
+        currentColorDialog = dialog
+        dialog.setOnDismissListener { currentColorDialog = null }
+    }
 
     private fun isLightColor(color: Int): Boolean {
         val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
@@ -416,7 +451,9 @@ class MainActivity : AppCompatActivity() {
             // Keep the sample banner in sync with the row's name and level.
             binding.nameField.addTextChangedListener(previewWatcher)
             binding.levelField.addTextChangedListener(previewWatcher)
-            refreshSwatchStrips()
+            binding.bgColorSwatch.setOnClickListener { showColorPicker(this, true) }
+            binding.fgColorSwatch.setOnClickListener { showColorPicker(this, false) }
+            refreshColorPreviews()
         }
 
         fun bind(threshold: AlertThreshold) {
@@ -427,11 +464,12 @@ class MainActivity : AppCompatActivity() {
             soundUri = threshold.soundUri
             binding.lockScreenCheck.isChecked = threshold.lockScreen
             binding.dndCheck.isChecked = threshold.overrideSilentDnd
+            binding.warnOnBatteryCheck.isChecked = threshold.warnOnlyOnBattery
             bgColor = threshold.bgColor
             fgColor = threshold.fgColor
             updateSoundLabel()
-            refreshSwatchStrips()
-            // The swatch strips refresh the selection rings; the sample banner
+            refreshColorPreviews()
+            // The swatch previews refresh the selection; the sample banner
             // must also pick up the loaded colors (setText above already
             // fired updatePreview with the defaults).
             updatePreview()
@@ -453,20 +491,13 @@ class MainActivity : AppCompatActivity() {
             binding.removeSoundButton.isEnabled = !silent
         }
 
-        private fun refreshSwatchStrips() {
-            buildSwatchStrip(binding.bgSwatchStrip, bgColor) { color ->
-                bgColor = color
-                refreshSwatchStrips()
-                updatePreview()
-            }
-            buildSwatchStrip(binding.fgSwatchStrip, fgColor) { color ->
-                fgColor = color
-                refreshSwatchStrips()
-                updatePreview()
-            }
+        /** Paints the two side-by-side color preview circles. */
+        fun refreshColorPreviews() {
+            binding.bgColorSwatch.background = swatchDrawable(bgColor, true)
+            binding.fgColorSwatch.background = swatchDrawable(fgColor, true)
         }
 
-        private fun updatePreview() {
+        fun updatePreview() {
             // Sample of the alert message: "<name>: <level>%", using the same
             // format as the banner that triggers when the level drops below
             // this threshold.
