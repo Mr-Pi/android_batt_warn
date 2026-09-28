@@ -265,6 +265,7 @@ class MainActivity : AppCompatActivity() {
         if (!valid || thresholds.isEmpty()) return
 
         AppSettings.saveThresholds(this, thresholds)
+        AppSettings.saveWarnOnlyOnBattery(this, binding.warnOnBatteryCheck.isChecked)
 
         // Restart so the running service applies the new values immediately.
         if (BatteryMonitorService.isRunning) {

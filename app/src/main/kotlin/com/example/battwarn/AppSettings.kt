@@ -79,6 +79,13 @@ object AppSettings {
      */
     fun warnOnlyOnBattery(context: Context): Boolean =
         prefs(context).getBoolean(KEY_WARN_ONLY_ON_BATTERY, DEFAULT_WARN_ONLY_ON_BATTERY)
+
+    /** Persists the "Warn only on battery" checkbox. */
+    fun saveWarnOnlyOnBattery(context: Context, warnOnlyOnBattery: Boolean) {
+        prefs(context).edit()
+            .putBoolean(KEY_WARN_ONLY_ON_BATTERY, warnOnlyOnBattery)
+            .apply()
+    }
 }
 
 /** The threshold's name, falling back to a generic label when blank. */

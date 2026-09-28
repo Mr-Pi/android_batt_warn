@@ -168,6 +168,23 @@ class MainActivityTest {
     }
 
     @Test
+    fun fields_roundTripThroughSave() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val row = rowAt(activity, 0)
+                row.findViewById<TextInputEditText>(R.id.name_field).setText("Urgent")
+                row.findViewById<TextInputEditText>(R.id.interval_field).setText("42")
+                row.findViewById<TextInputEditText>(R.id.duration_field).setText("7")
+                activity.findViewById<Button>(R.id.save_button).performClick()
+            }
+        }
+        val stored = AppSettings.thresholds(context).first()
+        assertEquals("edited name must persist", "Urgent", stored.name)
+        assertEquals("edited interval must persist", 42, stored.intervalSec)
+        assertEquals("edited duration must persist", 7, stored.durationSec)
+    }
+
+    @Test
     fun preview_textMatchesRowNameAndLevel() {
         AppSettings.saveThresholds(
             context,

@@ -8,13 +8,16 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.ParcelFileDescriptor
+import android.widget.Button
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.google.android.material.checkbox.MaterialCheckBox
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -96,6 +99,37 @@ class ChargingTest {
             "banner must show while charging (setting off)",
             await(10_000) { BatteryMonitorService.bannerShows > before }
         )
+    }
+
+    @Test
+    fun warnOnlyOnBattery_roundTripsThroughSave() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val check = activity.findViewById<MaterialCheckBox>(R.id.warn_on_battery_check)
+                assertTrue("must start checked with the setting on by default", check.isChecked)
+
+                check.performClick()
+                activity.findViewById<Button>(R.id.save_button).performClick()
+            }
+        }
+        assertFalse(
+            "saving must persist the unchecked warn-only setting",
+            AppSettings.warnOnlyOnBattery(context)
+        )
+    }
+
+    @Test
+    fun warnOnlyOnBattery_loadsSavedValue() {
+        AppSettings.prefs(context).edit()
+            .putBoolean(AppSettings.KEY_WARN_ONLY_ON_BATTERY, false)
+            .commit()
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val check = activity.findViewById<MaterialCheckBox>(R.id.warn_on_battery_check)
+                assertFalse("saved (off) value must be reflected on load", check.isChecked)
+            }
+        }
     }
 
     private fun setPrefs(warnOnlyOnBattery: Boolean) {
