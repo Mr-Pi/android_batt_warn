@@ -14,7 +14,9 @@ alerts before the battery gets too low.
 ## Features
 
 - Event-driven battery monitoring with no idle polling.
-- Warning and critical thresholds with independent timing settings.
+- User-configurable list of thresholds; each threshold has its own level, name,
+  sound, quiet interval, banner duration, lock-screen display, silent/DND
+  override, and background/text colors.
 - Critical alerts can play a user-picked notification sound.
 - Floating bottom banner when “Display over other apps” is enabled.
 - Full-screen lock-screen warning (default on) while the display is already on.
@@ -64,26 +66,27 @@ Android suppresses its boot receiver until the app is opened again.
 
 ## Alert behavior
 
-The app has two tiers:
-
-- **Warning**: `critical_threshold <= level < alert_threshold`; uses warning
-  duration and interval, without sound.
-- **Critical**: `level < critical_threshold`; uses critical duration and
-  interval, and plays the selected sound unless the ringer is silent/vibrate —
-  with the "Play critical sound in silent / Do Not Disturb" option it plays
-  even then (on the alarm channel).
+Each threshold in the list alerts below its level. The threshold that drives an
+alert is the **lowest level above the current battery percentage** — the most
+severe applicable tier. With thresholds at 20% and 9%, for example: at 15% the
+20% tier applies, at 8% the 9% tier applies, and at or above 20% the service
+stays idle. A threshold can carry an optional name (shown before the percentage
+and as the notification title), a picked sound, its own quiet interval and
+banner duration, a lock-screen toggle, a silent/DND override, and its own
+background/text colors for the banner and the lock-screen alert.
 
 The interval is a quiet pause measured **after** the previous banner closes,
 whether it auto-dismissed or was tapped. If the overlay permission is absent,
 the notification remains available and the fallback cycle is scheduled from the
 previous alert start.
 
-With **Show alert on lock screen** enabled (default) and the overlay permission
-granted, an alert that fires while the device is locked and the display is
-already on is drawn full-screen over the lock screen. The screen is never woken;
-with the display off the notification remains the surface. The platform only
-allows the background service to raise that full-screen activity because the
-overlay permission is granted.
+With **Show on lock screen** enabled for a threshold (default) and the overlay
+permission granted, an alert that fires while the device is locked and the
+display is already on is drawn full-screen over the lock screen in that
+threshold's colors. The screen is never woken; with the display off the
+notification remains the surface. The platform only allows the background
+service to raise that full-screen activity because the overlay permission is
+granted.
 
 Warnings pause while charging when **Warn only on battery** is enabled. The
 foreground notification continues to show the current level while charging.
@@ -93,10 +96,10 @@ for details.
 
 ## Battery usage
 
-While above the alert threshold, the service does not poll, schedule alarms, or
+While above every threshold, the service does not poll, schedule alarms, or
 hold a wake lock. It listens for `ACTION_BATTERY_CHANGED`. Active monitoring
-only cycles while below the threshold; the app uses no network, GPS, or other
-periodic background work.
+only cycles while below the highest threshold; the app uses no network, GPS, or
+other periodic background work.
 
 ## Project status
 
@@ -104,7 +107,7 @@ periodic background work.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 36
+- Instrumented tests: 43 (plus 7 JVM unit tests)
 
 ## Documentation
 
@@ -128,6 +131,7 @@ Runtime (bundled in the APK):
 Build/test-only:
 
 - [junit:junit 4.13.2](https://github.com/junit-team/junit4) — EPL-1.0
+- [org.json:json 20240303](https://github.com/stleary/JSON-java) — JSON license (build-time unit tests only)
 - [androidx.test:runner 1.6.2](https://developer.android.com/jetpack/androidx) — Apache-2.0
 - [androidx.test:rules 1.6.1](https://developer.android.com/jetpack/androidx) — Apache-2.0
 - [androidx.test:core-ktx 1.6.1](https://developer.android.com/jetpack/androidx) — Apache-2.0

@@ -30,26 +30,26 @@ import androidx.core.content.ContextCompat
 /**
  * Battery-respecting foreground service.
  *
- * IDLE mode (battery >= alert threshold): no polling at all. We listen for the
- * system's ACTION_BATTERY_CHANGED broadcast (fired on every battery change)
- * and check the level on start; the service becomes ACTIVE the moment the
- * level drops below the alert threshold.
+ * IDLE mode (battery at or above every threshold): no polling at all. We listen
+ * for the system's ACTION_BATTERY_CHANGED broadcast (fired on every battery
+ * change) and check the level on start; the service becomes ACTIVE the moment
+ * the level drops below the highest configured threshold.
  *
- * ACTIVE mode (battery below the alert threshold) has two tiers:
- *  - warning (critical <= level < alert): banner per warning timings.
- *  - critical (level < critical threshold): banner per critical timings and
- *    plays the configured alert sound.
- * Each banner stays up for the tier's duration; the NEXT banner is shown
- * interval seconds AFTER the banner closes — measured from the dismissal
- * (auto-dismiss or tap), so the interval is a quiet pause between alerts.
- * Without overlay permission there is no banner and thus no dismissal event;
- * the next cycle is then scheduled interval after the previous one started.
- * While the device is locked and the display is already on, the alert is shown
- * full-screen over the lock screen by [LockScreenAlertActivity] instead of the
- * overlay (see [shouldShowOnLockScreen]); the screen is never woken.
+ * ACTIVE mode picks the active tier with [activeThreshold] — the threshold with
+ * the smallest level the current level is strictly below. That tier's timings,
+ * sound, DND override, lock-screen flag, and colors drive the alert. Each
+ * banner stays up for the tier's duration; the NEXT banner is shown interval
+ * seconds AFTER the banner closes — measured from the dismissal (auto-dismiss
+ * or tap), so the interval is a quiet pause between alerts. Without overlay
+ * permission there is no banner and thus no dismissal event; the next cycle is
+ * then scheduled interval after the previous one started. While the device is
+ * locked and the display is already on, the alert is shown full-screen over
+ * the lock screen by [LockScreenAlertActivity] instead of the overlay (see
+ * [shouldShowOnLockScreen]); the screen is never woken.
  * The FGS notification is refreshed on every battery change (in both IDLE and
- * ACTIVE) so it always reflects the current level. Polling stops when the
- * battery rises back above the alert threshold or on ACTION_BATTERY_OKAY.
+ * ACTIVE) so it always reflects the current level and the active tier's name.
+ * Polling stops when the battery rises back above the highest threshold or on
+ * ACTION_BATTERY_OKAY.
  *
  * All thresholds/timings are read from SharedPreferences (see [AppSettings]).
  */
@@ -58,7 +58,7 @@ class BatteryMonitorService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var polling = false
     private var overlayAlert: OverlayAlert? = null
-    private var criticalRingtone: Ringtone? = null
+    private var alertRingtone: Ringtone? = null
 
     private val batteryActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -82,11 +82,10 @@ class BatteryMonitorService : Service() {
     private val pollTask = object : Runnable {
         override fun run() {
             val level = currentBatteryLevel()
-            val alertThreshold = AppSettings.alertThreshold(this@BatteryMonitorService)
-            val criticalThreshold = AppSettings.criticalThreshold(this@BatteryMonitorService)
-            updateNotification(level, alertThreshold, criticalThreshold)
-            if (level >= 0 && level < alertThreshold) {
-                showLowBatteryAlert(level, criticalThreshold)
+            val threshold = activeThreshold(level, AppSettings.thresholds(this@BatteryMonitorService))
+            updateNotification(level, threshold)
+            if (threshold != null) {
+                showLowBatteryAlert(level, threshold)
             } else {
                 stopPolling()
             }
@@ -95,14 +94,14 @@ class BatteryMonitorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createNotificationChannel()
-        val threshold = AppSettings.alertThreshold(this)
-        val criticalThreshold = AppSettings.criticalThreshold(this)
+        val thresholds = AppSettings.thresholds(this)
         val level = currentBatteryLevel()
         val suppressed = isChargingNow() && AppSettings.warnOnlyOnBattery(this)
-        startForeground(NOTIFICATION_ID, buildNotification(level, threshold, criticalThreshold, suppressed))
+        startForeground(NOTIFICATION_ID, buildNotification(level, activeThreshold(level, thresholds), suppressed))
         registerBatteryActions()
         registerLockAlertDismissReceiver()
-        if (level in 0 until threshold && !suppressed) {
+        val highest = highestThreshold(thresholds)
+        if (highest != null && level in 0 until highest.level && !suppressed) {
             startPolling()
         }
         isRunning = true
@@ -115,7 +114,7 @@ class BatteryMonitorService : Service() {
         overlayAlert?.hide() // may fire the dismissal callback — cancel its scheduling below
         handler.removeCallbacksAndMessages(null)
         try {
-            criticalRingtone?.stop()
+            alertRingtone?.stop()
         } catch (e: Exception) {
             // Already stopped or invalid.
         }
@@ -172,15 +171,14 @@ class BatteryMonitorService : Service() {
     /** Reacts to every battery change: refresh the notification and cross into ACTIVE if low. */
     private fun onBatteryChanged(intent: Intent?) {
         val level = levelFrom(intent)
-        val alertThreshold = AppSettings.alertThreshold(this)
-        val criticalThreshold = AppSettings.criticalThreshold(this)
+        val threshold = activeThreshold(level, AppSettings.thresholds(this))
         val suppressed = isChargingNow() && AppSettings.warnOnlyOnBattery(this)
-        updateNotification(level, alertThreshold, criticalThreshold, suppressed)
+        updateNotification(level, threshold, suppressed)
         when {
             // Charging with the setting on: pause — also cancels a pending
             // post-dismiss poll from an already-running cycle.
             suppressed -> stopPolling()
-            level >= 0 && level < alertThreshold -> startPolling()
+            threshold != null -> startPolling()
             else -> stopPolling()
         }
     }
@@ -207,23 +205,10 @@ class BatteryMonitorService : Service() {
         return if (level >= 0 && scale > 0) (level * 100) / scale else -1
     }
 
-    private fun showLowBatteryAlert(level: Int, criticalThreshold: Int) {
-        val critical = level < criticalThreshold
-        val interval = if (critical) {
-            AppSettings.criticalIntervalMillis(this)
-        } else {
-            AppSettings.pollIntervalMillis(this)
-        }
-        val duration = if (critical) {
-            AppSettings.criticalDurationMillis(this)
-        } else {
-            AppSettings.toastDurationMillis(this)
-        }
-        val message = if (critical) {
-            getString(R.string.toast_battery_critical, level)
-        } else {
-            getString(R.string.toast_battery_low, level)
-        }
+    private fun showLowBatteryAlert(level: Int, threshold: AlertThreshold) {
+        val interval = threshold.intervalSec * 1000L
+        val duration = threshold.durationSec * 1000L
+        val message = alertMessage(this, threshold, level)
 
         val overlayGranted = Settings.canDrawOverlays(this)
         val posted = when {
@@ -235,10 +220,10 @@ class BatteryMonitorService : Service() {
             shouldShowOnLockScreen(
                 isDeviceLocked(),
                 isScreenOn(),
-                AppSettings.showLockScreenAlert(this),
+                threshold.lockScreen,
                 overlayGranted
-            ) -> showLockScreenAlert(message, duration, interval)
-            overlayGranted -> showOverlayAlert(message, duration, interval)
+            ) -> showLockScreenAlert(message, duration, interval, threshold.bgColor, threshold.fgColor)
+            overlayGranted -> showOverlayAlert(message, duration, interval, threshold.bgColor, threshold.fgColor)
             else -> false
         }
 
@@ -249,7 +234,9 @@ class BatteryMonitorService : Service() {
             handler.postDelayed(pollTask, interval)
         }
 
-        if (critical) playCriticalSound()
+        if (threshold.soundUri.isNotEmpty()) {
+            playAlertSound(threshold.soundUri, threshold.overrideSilentDnd)
+        }
     }
 
     /**
@@ -257,9 +244,15 @@ class BatteryMonitorService : Service() {
      * returns false when the window could not be added, so the caller falls
      * back to scheduling from show time.
      */
-    private fun showOverlayAlert(message: String, duration: Long, interval: Long): Boolean {
+    private fun showOverlayAlert(
+        message: String,
+        duration: Long,
+        interval: Long,
+        bgColor: Int,
+        fgColor: Int
+    ): Boolean {
         val overlay = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
-        return overlay.show(message, duration) {
+        return overlay.show(message, duration, bgColor, fgColor) {
             lastBannerDismissedAtMs = SystemClock.elapsedRealtime()
             handler.removeCallbacks(pollTask)
             handler.postDelayed(pollTask, interval)
@@ -278,13 +271,21 @@ class BatteryMonitorService : Service() {
      * keeps the cycle alive from show time (the same point the overlay's
      * auto-dismiss+interval would land on).
      */
-    private fun showLockScreenAlert(message: String, duration: Long, interval: Long): Boolean {
+    private fun showLockScreenAlert(
+        message: String,
+        duration: Long,
+        interval: Long,
+        bgColor: Int,
+        fgColor: Int
+    ): Boolean {
         return try {
             startActivity(
                 Intent(this, LockScreenAlertActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra(LockScreenAlertActivity.EXTRA_MESSAGE, message)
                     .putExtra(LockScreenAlertActivity.EXTRA_DURATION_MS, duration)
+                    .putExtra(LockScreenAlertActivity.EXTRA_BG_COLOR, bgColor)
+                    .putExtra(LockScreenAlertActivity.EXTRA_FG_COLOR, fgColor)
             )
             handler.removeCallbacks(pollTask)
             handler.postDelayed(pollTask, duration + interval)
@@ -298,12 +299,9 @@ class BatteryMonitorService : Service() {
     /** Lock-screen alert closed (auto-dismiss or tap): pause, then next cycle. */
     private fun onLockAlertDismissed() {
         lastBannerDismissedAtMs = SystemClock.elapsedRealtime()
-        val critical = currentBatteryLevel() in 0 until AppSettings.criticalThreshold(this)
-        val interval = if (critical) {
-            AppSettings.criticalIntervalMillis(this)
-        } else {
-            AppSettings.pollIntervalMillis(this)
-        }
+        val level = currentBatteryLevel()
+        val threshold = activeThreshold(level, AppSettings.thresholds(this))
+        val interval = (threshold?.intervalSec ?: DEFAULT_INTERVAL_SEC) * 1000L
         handler.removeCallbacks(pollTask)
         handler.postDelayed(pollTask, interval)
     }
@@ -317,24 +315,23 @@ class BatteryMonitorService : Service() {
         getSystemService(PowerManager::class.java).isInteractive
 
     /**
-     * Plays the user-picked notification sound. By default it honors the
-     * ringer: silent pick, silent/vibrate ringer, or Do Not Disturb means no
-     * sound. With [AppSettings.overrideSilentDnd] the tone is routed to the
-     * alarm stream so it plays in silent/vibrate and typical DND — except a
-     * DND rule configured to silence alarms as well, which no app can pierce.
+     * Plays the threshold's picked notification sound. By default it honors
+     * the ringer: silent pick, silent/vibrate ringer, or Do Not Disturb means
+     * no sound. With the threshold's [AlertThreshold.overrideSilentDnd] the
+     * tone is routed to the alarm stream so it plays in silent/vibrate and
+     * typical DND — except a DND rule configured to silence alarms as well,
+     * which no app can pierce.
      */
-    private fun playCriticalSound() {
-        val uriText = AppSettings.criticalSoundUri(this)
+    private fun playAlertSound(uriText: String, override: Boolean) {
         if (uriText.isEmpty()) return
-        val override = AppSettings.overrideSilentDnd(this)
         val ringer = getSystemService(AudioManager::class.java).ringerMode
-        if (!shouldPlayCriticalSound(override, ringer)) return
+        if (!shouldPlayAlertSound(override, ringer)) return
         try {
             val ringtone = RingtoneManager.getRingtone(this, Uri.parse(uriText))
-            criticalRingtone?.stop()
-            if (override) ringtone?.audioAttributes = criticalSoundAlarmAttributes()
+            alertRingtone?.stop()
+            if (override) ringtone?.audioAttributes = alertSoundAlarmAttributes()
             ringtone?.play()
-            criticalRingtone = ringtone
+            alertRingtone = ringtone
         } catch (e: Exception) {
             // Invalid or unplayable URI — the banner and notification still inform the user.
         }
@@ -351,14 +348,12 @@ class BatteryMonitorService : Service() {
 
     private fun buildNotification(
         level: Int,
-        alertThreshold: Int,
-        criticalThreshold: Int,
+        threshold: AlertThreshold?,
         suppressed: Boolean = false
     ): Notification {
         val title = when {
-            suppressed && level >= 0 && level < alertThreshold -> getString(R.string.notif_title_monitoring)
-            level >= 0 && level < criticalThreshold -> getString(R.string.notif_title_critical)
-            level >= 0 && level < alertThreshold -> getString(R.string.notif_title_warning)
+            suppressed && threshold != null -> getString(R.string.notif_title_monitoring)
+            threshold != null -> threshold.displayName(this)
             else -> getString(R.string.notif_title_monitoring)
         }
         val text = if (level >= 0) {
@@ -378,12 +373,11 @@ class BatteryMonitorService : Service() {
 
     private fun updateNotification(
         level: Int,
-        alertThreshold: Int,
-        criticalThreshold: Int,
+        threshold: AlertThreshold?,
         suppressed: Boolean = false
     ) {
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildNotification(level, alertThreshold, criticalThreshold, suppressed))
+            .notify(NOTIFICATION_ID, buildNotification(level, threshold, suppressed))
     }
 
     companion object {
@@ -405,8 +399,8 @@ class BatteryMonitorService : Service() {
     }
 }
 
-/** Whether the critical sound is allowed at the given ringer mode. */
-internal fun shouldPlayCriticalSound(overrideSilentOrDnd: Boolean, ringerMode: Int): Boolean =
+/** Whether the alert sound is allowed at the given ringer mode. */
+internal fun shouldPlayAlertSound(overrideSilentOrDnd: Boolean, ringerMode: Int): Boolean =
     overrideSilentOrDnd || ringerMode == AudioManager.RINGER_MODE_NORMAL
 
 /**
@@ -424,10 +418,10 @@ internal fun shouldShowOnLockScreen(
 ): Boolean = setting && locked && interactive && overlayGranted
 
 /**
- * Audio attributes that route the critical sound to the alarm stream, which
+ * Audio attributes that route the alert sound to the alarm stream, which
  * Android keeps audible in silent/vibrate ringer and typical Do Not Disturb.
  */
-internal fun criticalSoundAlarmAttributes(): AudioAttributes =
+internal fun alertSoundAlarmAttributes(): AudioAttributes =
     AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ALARM)
         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)

@@ -10,44 +10,48 @@
     <string name="status_stopped">Monitoring stopped</string>
     <string name="status_running">Monitoring battery — alert below %1$d%%</string>
     <string name="status_saved">Settings saved — alert below %1$d%%</string>
-    <string name="toast_battery_critical">Battery critically low: %1$d%%</string>
-    <string name="toast_battery_low">Battery low: %1$d%%</string>
     <string name="channel_name">Battery monitor</string>
     <string name="notif_title_monitoring">Battery monitor active</string>
-    <string name="notif_title_warning">Battery low</string>
-    <string name="notif_title_critical">BATTERY CRITICALLY LOW</string>
     <string name="notif_text_level">Battery at %1$d%%</string>
     <string name="notif_text_unknown">Battery level unknown</string>
 
-    <!-- Settings section -->
-    <string name="settings_title">Alert settings</string>
-    <string name="warning_title">Warning</string>
-    <string name="critical_title">Critical</string>
-    <string name="note_warning">Alerts repeat below the alert level until the battery recovers. Alerts pause while charging.</string>
-    <string name="note_critical">Below the critical level: own timings and the alert sound.</string>
-    <string name="warn_on_battery">Warn only on battery</string>
-    <string name="label_alert">Alert below %</string>
+    <!-- Threshold list section -->
+    <string name="thresholds_title">Alert thresholds</string>
+    <string name="note_thresholds">Each threshold alerts below its level. The lowest threshold above the current level drives the alert.</string>
+    <string name="add_threshold">Add threshold</string>
+    <string name="remove_threshold">Remove</string>
+    <string name="label_level">Alert below %</string>
     <string name="label_interval">Interval s</string>
     <string name="label_duration">Duration s</string>
-    <string name="label_critical">Critical below %</string>
-    <string name="label_critical_interval">Critical interval s</string>
-    <string name="label_critical_duration">Critical duration s</string>
+    <string name="label_name">Name</string>
+    <string name="hint_name">e.g. Battery low</string>
     <string name="hint_percent">0–100</string>
-    <string name="hint_seconds_warning">≥1</string>
-    <string name="hint_seconds_duration">≥1</string>
-    <string name="label_sound">Alert sound</string>
+    <string name="hint_seconds">≥1</string>
+    <string name="label_sound">Sound</string>
     <string name="sound_silent">Silent</string>
-    <string name="pick_sound">Pick sound</string>
-    <string name="remove_sound">Remove sound</string>
-    <string name="override_silent_dnd">Play critical sound in silent / Do Not Disturb</string>
-    <string name="note_override_silent_dnd">Plays the critical sound on the alarm channel, so it is audible even with a silent ringer. A Do Not Disturb rule that also silences alarms still wins.</string>
-    <string name="lock_screen_alert">Show alert on lock screen</string>
-    <string name="note_lock_screen_alert">Draws the alert over the lock screen while the display is on and the device is locked (uses the \"Display over other apps\" permission). The screen is never woken; with the display off the notification is the surface.</string>
+    <string name="pick_sound">Pick</string>
+    <string name="remove_sound">Remove</string>
+    <string name="lock_screen_alert">Show on lock screen</string>
+    <string name="override_silent_dnd">Play in silent / DND</string>
+    <string name="label_bg_color">Background</string>
+    <string name="label_fg_color">Text</string>
+    <string name="preview_sample">Battery low: 20%</string>
+    <string name="color_swatch_desc">Color swatch</string>
+
+    <!-- Alert message -->
+    <string name="alert_name_default">Battery low</string>
+    <string name="alert_message_format">%1$s: %2$d%%</string>
+
+    <!-- Global settings -->
+    <string name="warn_on_battery">Warn only on battery</string>
+    <string name="note_warn_on_battery">Alerts pause while charging.</string>
     <string name="save_settings">Save</string>
-    <string name="error_alert">0–100</string>
+
+    <!-- Validation errors -->
+    <string name="error_level">0–100</string>
     <string name="error_interval">Seconds (≥1)</string>
     <string name="error_duration">Seconds (≥1)</string>
-    <string name="error_critical_le_alert">≤ alert</string>
+    <string name="error_duplicate">Duplicate level</string>
 
     <!-- About / legal section -->
     <string name="about_button">About</string>

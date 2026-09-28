@@ -4,6 +4,8 @@ package com.example.battwarn
 
 import android.content.Context
 import android.os.ParcelFileDescriptor
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
@@ -11,6 +13,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.core.view.WindowInsetsControllerCompat
+import com.google.android.material.textfield.TextInputEditText
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,7 +24,8 @@ import org.junit.runner.RunWith
 /**
  * Launches the main activity and checks the battery UI is populated, the
  * single Start/Stop toggle reflects the service state, the level updates
- * live while visible, and the alert sound can be silenced.
+ * live while visible, and threshold rows can be loaded, added, and have
+ * their per-threshold sound removed.
  */
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
@@ -85,30 +89,88 @@ class MainActivityTest {
 
     @Test
     fun removeSound_clearsUriAndShowsSilent() {
-        AppSettings.prefs(context).edit()
-            .putString(
-                AppSettings.KEY_CRITICAL_SOUND_URI,
-                "content://settings/system/notification_sound"
+        AppSettings.saveThresholds(
+            context,
+            listOf(
+                AppSettings.DEFAULT_NEW_THRESHOLD.copy(
+                    soundUri = "content://settings/system/notification_sound"
+                )
             )
-            .commit()
+        )
 
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val value = activity.findViewById<TextView>(R.id.sound_value)
-                val remove = activity.findViewById<Button>(R.id.remove_sound_button)
+                val row = rowAt(activity, 0)
+                val value = row.findViewById<TextView>(R.id.sound_value)
+                val remove = row.findViewById<Button>(R.id.remove_sound_button)
                 assertTrue("remove button should be enabled with a tone", remove.isEnabled)
 
                 remove.performClick()
 
-                assertEquals(
-                    "remove must clear the stored tone",
-                    "",
-                    AppSettings.criticalSoundUri(context)
-                )
                 assertEquals(activity.getString(R.string.sound_silent), value.text.toString())
                 assertFalse("remove must disable itself once silent", remove.isEnabled)
+
+                activity.findViewById<Button>(R.id.save_button).performClick()
             }
         }
+        assertEquals(
+            "remove must clear the stored tone after saving",
+            "",
+            AppSettings.thresholds(context).first().soundUri
+        )
+    }
+
+    @Test
+    fun addThreshold_addsRowAndPersists() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+                val before = container.childCount
+
+                activity.findViewById<Button>(R.id.add_threshold_button).performClick()
+                assertEquals("add must append a row", before + 1, container.childCount)
+
+                // Give the new row a distinct level and save.
+                val row = rowAt(activity, before)
+                row.findViewById<TextInputEditText>(R.id.level_field).setText("25")
+                activity.findViewById<Button>(R.id.save_button).performClick()
+            }
+        }
+        assertTrue(
+            "new threshold must persist after saving",
+            AppSettings.thresholds(context).any { it.level == 25 }
+        )
+    }
+
+    @Test
+    fun rows_loadSavedThresholds() {
+        AppSettings.saveThresholds(
+            context,
+            listOf(threshold(30), threshold(10))
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+                assertEquals("saved thresholds must render as rows", 2, container.childCount)
+                assertEquals(
+                    "30",
+                    rowAt(activity, 0).findViewById<TextInputEditText>(R.id.level_field).text.toString()
+                )
+                assertEquals(
+                    "10",
+                    rowAt(activity, 1).findViewById<TextInputEditText>(R.id.level_field).text.toString()
+                )
+            }
+        }
+    }
+
+    private fun threshold(level: Int): AlertThreshold =
+        AppSettings.DEFAULT_NEW_THRESHOLD.copy(level = level)
+
+    private fun rowAt(activity: MainActivity, index: Int): View {
+        val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+        return container.getChildAt(index)
     }
 
     private fun textOf(scenario: ActivityScenario<MainActivity>, viewId: Int): String? {

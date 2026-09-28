@@ -55,9 +55,13 @@ class LockScreenAlertActivity : AppCompatActivity() {
     /** Shows the message and (re)arms the auto-dismiss timer. */
     private fun render(intent: Intent?) {
         val message = intent?.getStringExtra(EXTRA_MESSAGE)
-            ?: getString(R.string.toast_battery_low, 0)
+            ?: getString(R.string.alert_message_format, getString(R.string.alert_name_default), 0)
         val duration = intent?.getLongExtra(EXTRA_DURATION_MS, DEFAULT_DURATION_MS)
             ?: DEFAULT_DURATION_MS
+        val bgColor = intent?.getIntExtra(EXTRA_BG_COLOR, DEFAULT_BG_COLOR) ?: DEFAULT_BG_COLOR
+        val fgColor = intent?.getIntExtra(EXTRA_FG_COLOR, DEFAULT_FG_COLOR) ?: DEFAULT_FG_COLOR
+        binding.root.setBackgroundColor(bgColor)
+        binding.lockAlertText.setTextColor(fgColor)
         binding.lockAlertText.text = message
         handler.removeCallbacks(dismissTask)
         handler.postDelayed(dismissTask, duration)
@@ -76,6 +80,8 @@ class LockScreenAlertActivity : AppCompatActivity() {
         const val ACTION_LOCK_ALERT_DISMISSED = "com.example.battwarn.LOCK_ALERT_DISMISSED"
         const val EXTRA_MESSAGE = "com.example.battwarn.extra.MESSAGE"
         const val EXTRA_DURATION_MS = "com.example.battwarn.extra.DURATION_MS"
+        const val EXTRA_BG_COLOR = "com.example.battwarn.extra.BG_COLOR"
+        const val EXTRA_FG_COLOR = "com.example.battwarn.extra.FG_COLOR"
         const val DEFAULT_DURATION_MS = 5_000L
     }
 }

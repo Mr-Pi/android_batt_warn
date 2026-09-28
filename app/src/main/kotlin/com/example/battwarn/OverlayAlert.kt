@@ -3,6 +3,7 @@
 package com.example.battwarn
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
@@ -31,20 +32,28 @@ class OverlayAlert(context: Context) {
 
     /**
      * Shows the banner for [durationMs], then removes it. Tap dismisses early.
-     * [onDismissed] (set the next time the banner closes, whether that is the
-     * auto-dismiss or the tap) is invoked on the main looper exactly once.
-     * Returns false when the overlay could not be added (e.g. permission
-     * revoked) — no callback will fire in that case.
+     * [bgColor]/[fgColor] tint the banner surface (the rounded background and
+     * the text) per the active threshold. [onDismissed] (set the next time the
+     * banner closes, whether that is the auto-dismiss or the tap) is invoked
+     * on the main looper exactly once. Returns false when the overlay could
+     * not be added (e.g. permission revoked) — no callback will fire in that case.
      */
     fun show(
         message: CharSequence,
         durationMs: Long,
+        bgColor: Int = DEFAULT_BG_COLOR,
+        fgColor: Int = DEFAULT_FG_COLOR,
         onDismissed: (() -> Unit)? = null
     ): Boolean {
         hide()
 
         val v = LayoutInflater.from(appContext).inflate(R.layout.overlay_banner, null)
-        v.findViewById<TextView>(R.id.overlay_banner_text).text = message
+        val text = v.findViewById<TextView>(R.id.overlay_banner_text)
+        text.text = message
+        // Tinting the rounded shape drawable keeps the corners while swapping
+        // the threshold's background color.
+        text.backgroundTintList = ColorStateList.valueOf(bgColor)
+        text.setTextColor(fgColor)
         v.setOnClickListener { hide() }
 
         val params = WindowManager.LayoutParams(

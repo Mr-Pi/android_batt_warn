@@ -20,9 +20,9 @@ import org.junit.runner.RunWith
 
 /**
  * End-to-end regression test for threshold detection: when the battery drops
- * below the configured alert level, the service must enter ACTIVE mode and
- * the notification must switch to the warning title ("Battery low") showing
- * the current level — still above the critical threshold, so no sound.
+ * below the highest configured level, the service must enter ACTIVE mode and
+ * the notification must switch to the active threshold's name showing the
+ * current level — still above any lower threshold, so no sound.
  */
 @RunWith(AndroidJUnit4::class)
 class BatteryDropTest {
@@ -41,14 +41,11 @@ class BatteryDropTest {
     }
 
     @Test
-    fun batteryDropBelowAlertThreshold_showsWarningTitle() {
+    fun batteryDropBelowAlertThreshold_showsThresholdName() {
         grantNotificationPermission()
 
-        // High alert threshold so the emulator's default 100% starts in IDLE.
-        // Critical stays at its default (5) — this tests the warning tier.
-        AppSettings.prefs(context).edit()
-            .putInt(AppSettings.KEY_ALERT_THRESHOLD, 90)
-            .commit()
+        // Single high threshold so the emulator's default 100% starts in IDLE.
+        AppSettings.saveThresholds(context, listOf(threshold(90, "Battery low")))
 
         ActivityScenario.launch(MainActivity::class.java).use {
             ContextCompat.startForegroundService(
@@ -57,19 +54,18 @@ class BatteryDropTest {
             )
             assertTrue("service did not start", await(10_000) { BatteryMonitorService.isRunning })
 
-            // Drop the battery below the alert threshold (but above critical).
+            // Drop the battery below the threshold.
             shell("dumpsys battery set ac 0")
             shell("dumpsys battery set level 50")
 
             val nm = context.getSystemService(NotificationManager::class.java)
-            val warningTitle = context.getString(R.string.notif_title_warning)
 
             assertTrue(
-                "notification did not show the warning title",
+                "notification did not show the threshold name",
                 await(10_000) {
                     nm.activeNotifications.any {
                         it.notification.extras
-                            .getCharSequence(Notification.EXTRA_TITLE)?.toString() == warningTitle
+                            .getCharSequence(Notification.EXTRA_TITLE)?.toString() == "Battery low"
                     }
                 }
             )
@@ -80,6 +76,9 @@ class BatteryDropTest {
             assertEquals("notification must show the current battery level", expectedText, text)
         }
     }
+
+    private fun threshold(level: Int, name: String): AlertThreshold =
+        AppSettings.DEFAULT_NEW_THRESHOLD.copy(level = level, name = name)
 
     private fun grantNotificationPermission() {
         try {

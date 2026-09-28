@@ -4,26 +4,32 @@
 
 | Component | Responsibility |
 | --- | --- |
-| `MainActivity` | Compact settings UI, live battery percentage, permissions, sound picker |
-| `BatteryMonitorService` | Foreground service, battery receiver, tier state machine, notification and alert scheduling |
+| `MainActivity` | Dynamic threshold-list settings UI, live battery percentage, permissions, per-threshold sound picker and color palette |
+| `BatteryMonitorService` | Foreground service, battery receiver, active-tier selection, notification and alert scheduling |
 | `BootReceiver` | Starts the foreground service for `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` |
-| `AppSettings` | SharedPreferences keys, defaults, clamping, and persisted settings |
-| `OverlayAlert` | Bottom `TYPE_APPLICATION_OVERLAY` banner with auto/tap dismissal |
-| `LockScreenAlertActivity` | Full-screen `showWhenLocked` warning above the keyguard; auto/tap dismissal |
+| `AppSettings` | SharedPreferences keys, defaults, threshold-list persistence, and settings accessors |
+| `AlertThreshold` | Data class for one tier (level, name, timings, sound, flags, colors), JSON codec, and pure selection helpers |
+| `OverlayAlert` | Bottom `TYPE_APPLICATION_OVERLAY` banner with auto/tap dismissal, tinted per threshold |
+| `LockScreenAlertActivity` | Full-screen `showWhenLocked` warning above the keyguard; auto/tap dismissal; colored per threshold |
 
 ## State flow
 
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> WARNING: battery changed below alert threshold
-    IDLE --> CRITICAL: battery changed below critical threshold
-    WARNING --> CRITICAL: level crosses critical threshold
-    CRITICAL --> WARNING: level rises above critical threshold
-    WARNING --> IDLE: level reaches alert threshold
-    CRITICAL --> IDLE: level reaches alert threshold
-    WARNING --> IDLE: charging + Warn only on battery
-    CRITICAL --> IDLE: charging + Warn only on battery
+    IDLE --> ACTIVE: battery changed below highest threshold
+    ACTIVE --> IDLE: level reaches highest threshold or ACTION_BATTERY_OKAY
+    ACTIVE --> IDLE: charging + Warn only on battery
+```
+
+While ACTIVE, the tier is selected on every cycle:
+
+```mermaid
+flowchart LR
+    L[level] --> A{below any threshold?}
+    A -- no --> IDLE
+    A -- yes --> T[active = threshold with smallest level still above level]
+    T --> Alert[use that tier's timing, sound, lock screen, colors]
 ```
 
 `ACTION_BATTERY_CHANGED` is registered dynamically. It delivers the sticky
@@ -32,8 +38,9 @@ current value on registration and subsequent battery/plug-state changes.
 ## Alert scheduling
 
 1. A battery event refreshes the foreground notification immediately.
-2. If the level is below `alert_threshold`, the service enters an active tier.
-3. The banner is shown for the tier duration.
+2. If the level is below the highest threshold, the service enters the active
+   tier ([activeThreshold]).
+3. The banner is shown for the tier duration in the tier's colors.
 4. When the banner closes, the service waits the tier interval.
 5. The next cycle reads settings and battery level again.
 
@@ -42,9 +49,10 @@ single dismissal callback for either auto-dismiss or tap. Without overlay
 permission, the notification remains the fallback and the interval starts from
 the alert attempt.
 
-While the device is locked with the display already on, `LockScreenAlertActivity`
-is used instead of the overlay (the overlay cannot show above the keyguard). It
-reports dismissal back to the service through an in-app broadcast, so the same
+While the device is locked with the display already on and the active
+threshold's lock-screen flag is set, `LockScreenAlertActivity` is used instead
+of the overlay (the overlay cannot show above the keyguard). It reports
+dismissal back to the service through an in-app broadcast, so the same
 interval rule applies. This path also requires the overlay permission, which is
 what permits the background activity start (`BAL_ALLOW_SAW_PERMISSION`).
 
@@ -54,16 +62,15 @@ Settings are stored in `battwarn_settings`:
 
 | Key | Default | Meaning |
 | --- | ---: | --- |
-| `alert_threshold` | 10 | Warning threshold, percent |
-| `poll_interval_sec` | 25 | Warning quiet pause, seconds |
-| `toast_duration_sec` | 5 | Warning banner duration, seconds |
-| `critical_threshold` | 5 | Critical threshold, percent |
-| `critical_interval_sec` | 15 | Critical quiet pause, seconds |
-| `critical_duration_sec` | 5 | Critical banner duration, seconds |
-| `critical_sound_uri` | empty | Picked notification sound; empty is silent |
+| `thresholds` | 20%/9% baseline | JSON list of user thresholds; each has `level`, `name`, `intervalSec`, `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`, `fgColor` |
 | `warn_only_on_battery` | true | Suppress warnings while AC/USB/wireless charging |
-| `override_silent_dnd` | false | Play critical sound in silent/vibrate/DND (alarm stream) |
-| `lock_screen_alert` | true | Draw the alert full-screen over the lock screen (display already on) |
+
+The fresh-install baseline is a 20% "Battery low" tier and a 9% "Battery
+critical" tier, both silent, with lock-screen display on and the default red
+background/white text. Legacy single-key settings are ignored (no migration);
+when the stored list is empty the baseline is returned.
 
 Intervals and durations accept values of one second or greater with no upper
-cap. Critical threshold is always clamped to the alert threshold.
+cap. Levels are clamped to 0–100, must be unique, and are stored sorted by
+level descending (most severe first). Colors are persisted as `#RRGGBB`
+strings and parsed by the pure `parseHexColor` helper.

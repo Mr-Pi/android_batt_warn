@@ -45,11 +45,18 @@ class AlertIntervalTest {
 
         // Minimums keep the test fast and cover the 1s lower bound:
         // banner 1s on, 1s pause after close, so shows repeat ~every 2s.
-        AppSettings.prefs(context).edit()
-            .putInt(AppSettings.KEY_ALERT_THRESHOLD, 90)
-            .putInt(AppSettings.KEY_POLL_INTERVAL_SEC, 1)
-            .putInt(AppSettings.KEY_TOAST_DURATION_SEC, 1)
-            .commit()
+        AppSettings.saveThresholds(
+            context,
+            listOf(
+                AppSettings.DEFAULT_NEW_THRESHOLD.copy(
+                    level = 90,
+                    name = "Battery low",
+                    intervalSec = 1,
+                    durationSec = 1,
+                    lockScreen = false
+                )
+            )
+        )
         shell("dumpsys battery set ac 0")
         shell("dumpsys battery set level 50")
 

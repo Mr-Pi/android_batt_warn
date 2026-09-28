@@ -101,10 +101,19 @@ class ChargingTest {
     private fun setPrefs(warnOnlyOnBattery: Boolean) {
         AppSettings.prefs(context).edit()
             .putBoolean(AppSettings.KEY_WARN_ONLY_ON_BATTERY, warnOnlyOnBattery)
-            .putInt(AppSettings.KEY_ALERT_THRESHOLD, 90)
-            .putInt(AppSettings.KEY_POLL_INTERVAL_SEC, 5)
-            .putInt(AppSettings.KEY_TOAST_DURATION_SEC, 1)
             .commit()
+        AppSettings.saveThresholds(
+            context,
+            listOf(
+                AppSettings.DEFAULT_NEW_THRESHOLD.copy(
+                    level = 90,
+                    name = "Battery low",
+                    intervalSec = 5,
+                    durationSec = 1,
+                    lockScreen = false
+                )
+            )
+        )
     }
 
     private fun startService() {

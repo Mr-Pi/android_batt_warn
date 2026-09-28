@@ -28,18 +28,31 @@ afterward through `scripts/test-report.sh`, producing one status line per test.
 
 ## Test coverage
 
-The emulator suite currently contains 36 tests across these classes:
+The emulator suite currently contains 43 tests across these classes:
 
 - `AlertIntervalTest` — dismissal-based duration + quiet pause cycle.
-- `BatteryDropTest` — below-alert detection and warning notification title.
+- `BatteryDropTest` — below-highest-threshold detection and the active tier's
+  notification title.
 - `BootReceiverTest` — manifest contract and real boot/package-replace starts.
 - `ChargingTest` — pause while charging, resume on unplug, opt-out behavior.
-- `CriticalThresholdTest` — warning/critical split and threshold clamping.
-- `LockScreenAlertTest` — lock-screen gate, activity render/auto-dismiss, UI round-trip.
-- `MainActivityTest` — compact UI, live battery level, remove-sound behavior.
+- `LockScreenAlertTest` — lock-screen gate, activity render/colors/auto-dismiss,
+  UI round-trip.
+- `MainActivityTest` — compact UI, live battery level, add/load threshold rows,
+  per-row remove-sound behavior.
 - `OverlayAlertTest` — permission, render/hide, dismissal callback behavior.
-- `OverrideSilentDndTest` — silent/DND override gate, alarm attributes, UI round-trip.
+- `OverrideSilentDndTest` — per-threshold silent/DND override gate, alarm
+  attributes, UI round-trip.
 - `ServiceSmokeTest` — foreground lifecycle and notification.
+- `ThresholdConfigTest` — fresh baseline, JSON persistence round-trip, sorting,
+  selection from the stored list.
+- `ThresholdSelectionTest` — two-threshold end-to-end title flips and the pure
+  selection helper.
+
+The pure model logic (active-tier selection, JSON codec, color parsing) is also
+covered by JVM unit tests in `app/src/test` (`AlertThresholdTest`, 7 tests) —
+they run with `gradle testUnitTest` and need no emulator. The unit tests use
+the `org.json` artifact because the platform's JSON classes are not available on
+the plain JVM.
 
 ## Emulator notes
 
@@ -50,3 +63,5 @@ The emulator suite currently contains 36 tests across these classes:
   UiAutomation/appops where needed.
 - Installing an updated APK can emit `MY_PACKAGE_REPLACED`, which intentionally
   starts the service. Reset battery state and force-stop after manual checks.
+- Threshold tests clear `battwarn_settings` in teardown so the fresh 20%/9%
+  baseline applies between classes.

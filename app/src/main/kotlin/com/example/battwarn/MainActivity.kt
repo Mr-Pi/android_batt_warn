@@ -8,6 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.BatteryManager
@@ -16,6 +19,8 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -24,10 +29,14 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.battwarn.databinding.ActivityMainBinding
+import com.example.battwarn.databinding.ItemThresholdBinding
+import com.google.android.material.checkbox.MaterialCheckBox
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val rows = mutableListOf<ThresholdRow>()
+    private var pendingSoundRow: ThresholdRow? = null
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -52,10 +61,11 @@ class MainActivity : AppCompatActivity() {
                 @Suppress("DEPRECATION")
                 result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
             }
-            AppSettings.prefs(this).edit()
-                .putString(AppSettings.KEY_CRITICAL_SOUND_URI, uri?.toString() ?: "")
-                .apply()
-            updateSoundLabel()
+            pendingSoundRow?.let { row ->
+                row.soundUri = uri?.toString() ?: ""
+                row.updateSoundLabel()
+            }
+            pendingSoundRow = null
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,8 +91,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.monitorButton.setOnClickListener { toggleMonitoring() }
         binding.saveButton.setOnClickListener { saveSettings() }
-        binding.pickSoundButton.setOnClickListener { pickSound() }
-        binding.removeSoundButton.setOnClickListener { removeSound() }
+        binding.addThresholdButton.setOnClickListener { addRow() }
         binding.aboutButton.setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
         }
@@ -127,7 +136,7 @@ class MainActivity : AppCompatActivity() {
             if (running) R.string.stop_monitoring else R.string.start_monitoring
         )
         binding.statusText.text = if (running) {
-            getString(R.string.status_running, AppSettings.alertThreshold(this))
+            getString(R.string.status_running, highestThreshold(AppSettings.thresholds(this))?.level ?: 0)
         } else {
             getString(R.string.status_stopped)
         }
@@ -144,43 +153,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadSettingsIntoFields() {
-        binding.alertField.setText(AppSettings.alertThreshold(this).toString())
-        binding.intervalField.setText((AppSettings.pollIntervalMillis(this) / 1000L).toString())
-        binding.durationField.setText((AppSettings.toastDurationMillis(this) / 1000L).toString())
-        binding.criticalField.setText(AppSettings.criticalThreshold(this).toString())
-        binding.criticalIntervalField.setText((AppSettings.criticalIntervalMillis(this) / 1000L).toString())
-        binding.criticalDurationField.setText((AppSettings.criticalDurationMillis(this) / 1000L).toString())
         binding.warnOnBatteryCheck.isChecked = AppSettings.warnOnlyOnBattery(this)
-        binding.overrideSilentCheck.isChecked = AppSettings.overrideSilentDnd(this)
-        binding.lockScreenCheck.isChecked = AppSettings.showLockScreenAlert(this)
-        updateSoundLabel()
+        renderRows()
     }
 
-    private fun updateSoundLabel() {
-        val uriText = AppSettings.criticalSoundUri(this)
-        val silent = uriText.isEmpty()
-        binding.soundValue.text = if (silent) {
-            getString(R.string.sound_silent)
-        } else {
-            try {
-                RingtoneManager.getRingtone(this, Uri.parse(uriText))?.getTitle(this)
-                    ?: getString(R.string.sound_silent)
-            } catch (e: Exception) {
-                getString(R.string.sound_silent)
-            }
-        }
-        binding.removeSoundButton.isEnabled = !silent
+    private fun renderRows() {
+        binding.thresholdsContainer.removeAllViews()
+        rows.clear()
+        AppSettings.thresholds(this).forEach { addRow(it) }
+        if (rows.isEmpty()) addRow()
+        updateRemoveButtons()
     }
 
-    private fun removeSound() {
-        AppSettings.prefs(this).edit()
-            .putString(AppSettings.KEY_CRITICAL_SOUND_URI, "")
-            .apply()
-        updateSoundLabel()
+    private fun addRow(threshold: AlertThreshold = AppSettings.DEFAULT_NEW_THRESHOLD) {
+        val rowBinding = ItemThresholdBinding.inflate(
+            layoutInflater,
+            binding.thresholdsContainer,
+            false
+        )
+        val row = ThresholdRow(rowBinding)
+        row.bind(threshold)
+        binding.thresholdsContainer.addView(rowBinding.root)
+        rows.add(row)
+        updateRemoveButtons()
     }
 
-    private fun pickSound() {
-        val current = AppSettings.criticalSoundUri(this)
+    private fun removeRow(row: ThresholdRow) {
+        binding.thresholdsContainer.removeView(row.binding.root)
+        rows.remove(row)
+        updateRemoveButtons()
+    }
+
+    private fun updateRemoveButtons() {
+        val canRemove = rows.size > 1
+        rows.forEach { it.binding.removeThresholdButton.isEnabled = canRemove }
+    }
+
+    private fun pickSound(row: ThresholdRow) {
+        pendingSoundRow = row
+        val current = row.soundUri
         val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
             putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
             putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, getString(R.string.label_sound))
@@ -199,57 +210,59 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveSettings() {
-        val alert = binding.alertField.text.toString().toIntOrNull()
-        val intervalSec = binding.intervalField.text.toString().toIntOrNull()
-        val durationSec = binding.durationField.text.toString().toIntOrNull()
-        val critical = binding.criticalField.text.toString().toIntOrNull()
-        val criticalIntervalSec = binding.criticalIntervalField.text.toString().toIntOrNull()
-        val criticalDurationSec = binding.criticalDurationField.text.toString().toIntOrNull()
-
         var valid = true
+        val seenLevels = mutableSetOf<Int>()
+        val thresholds = rows.mapNotNull { row ->
+            val level = row.binding.levelField.text.toString().toIntOrNull()
+            val interval = row.binding.intervalField.text.toString().toIntOrNull()
+            val duration = row.binding.durationField.text.toString().toIntOrNull()
+            var rowValid = true
 
-        val alertValid = alert != null && alert in 0..100
-        val intervalValid = intervalSec != null && intervalSec > 0
-        val durationValid = durationSec != null && durationSec > 0
-        val criticalValid = critical != null && critical in 0..100
-        val criticalIntervalValid = criticalIntervalSec != null && criticalIntervalSec > 0
-        val criticalDurationValid = criticalDurationSec != null && criticalDurationSec > 0
-        val criticalLeAlert = critical != null && alert != null && critical <= alert
+            row.binding.levelLayout.error = when {
+                level == null || level !in 0..100 -> {
+                    rowValid = false
+                    getString(R.string.error_level)
+                }
+                !seenLevels.add(level) -> {
+                    rowValid = false
+                    getString(R.string.error_duplicate)
+                }
+                else -> null
+            }
+            row.binding.intervalLayout.error = if (interval == null || interval <= 0) {
+                rowValid = false
+                getString(R.string.error_interval)
+            } else {
+                null
+            }
+            row.binding.durationLayout.error = if (duration == null || duration <= 0) {
+                rowValid = false
+                getString(R.string.error_duration)
+            } else {
+                null
+            }
 
-        binding.alertField.error = if (alertValid) null else getString(R.string.error_alert)
-        binding.intervalField.error = if (intervalValid) null else getString(R.string.error_interval)
-        binding.durationField.error = if (durationValid) null else getString(R.string.error_duration)
-        binding.criticalField.error = when {
-            !criticalValid -> getString(R.string.error_alert)
-            !criticalLeAlert -> getString(R.string.error_critical_le_alert)
-            else -> null
+            if (!rowValid) {
+                valid = false
+                null
+            } else {
+                AlertThreshold(
+                    level = level!!,
+                    name = row.binding.nameField.text.toString().trim(),
+                    intervalSec = interval!!,
+                    durationSec = duration!!,
+                    soundUri = row.soundUri,
+                    lockScreen = row.binding.lockScreenCheck.isChecked,
+                    overrideSilentDnd = row.binding.dndCheck.isChecked,
+                    bgColor = row.bgColor,
+                    fgColor = row.fgColor,
+                )
+            }
         }
-        binding.criticalIntervalField.error = if (criticalIntervalValid) {
-            null
-        } else {
-            getString(R.string.error_interval)
-        }
-        binding.criticalDurationField.error = if (criticalDurationValid) {
-            null
-        } else {
-            getString(R.string.error_duration)
-        }
-        valid = alertValid && intervalValid && durationValid &&
-            criticalValid && criticalIntervalValid && criticalDurationValid && criticalLeAlert
 
-        if (!valid) return
+        if (!valid || thresholds.isEmpty()) return
 
-        AppSettings.prefs(this).edit()
-            .putInt(AppSettings.KEY_ALERT_THRESHOLD, alert!!)
-            .putInt(AppSettings.KEY_POLL_INTERVAL_SEC, intervalSec!!)
-            .putInt(AppSettings.KEY_TOAST_DURATION_SEC, durationSec!!)
-            .putInt(AppSettings.KEY_CRITICAL_THRESHOLD, critical!!)
-            .putInt(AppSettings.KEY_CRITICAL_INTERVAL_SEC, criticalIntervalSec!!)
-            .putInt(AppSettings.KEY_CRITICAL_DURATION_SEC, criticalDurationSec!!)
-            .putBoolean(AppSettings.KEY_WARN_ONLY_ON_BATTERY, binding.warnOnBatteryCheck.isChecked)
-            .putBoolean(AppSettings.KEY_OVERRIDE_SILENT_DND, binding.overrideSilentCheck.isChecked)
-            .putBoolean(AppSettings.KEY_LOCK_SCREEN_ALERT, binding.lockScreenCheck.isChecked)
-            .apply()
+        AppSettings.saveThresholds(this, thresholds)
 
         // Restart so the running service applies the new values immediately.
         if (BatteryMonitorService.isRunning) {
@@ -259,7 +272,8 @@ class MainActivity : AppCompatActivity() {
                 Intent(this, BatteryMonitorService::class.java)
             )
         }
-        binding.statusText.text = getString(R.string.status_saved, alert)
+        val highest = thresholds.maxOf { it.level }
+        binding.statusText.text = getString(R.string.status_saved, highest)
     }
 
     private fun refreshBattery() {
@@ -269,11 +283,11 @@ class MainActivity : AppCompatActivity() {
     private fun renderLevel(percent: Int) {
         if (percent < 0) return
         binding.batteryText.text = getString(R.string.battery_format, percent)
+        val highest = highestThreshold(AppSettings.thresholds(this))?.level ?: 100
         binding.batteryText.setTextColor(
             ContextCompat.getColor(
                 this,
-                if (percent < AppSettings.alertThreshold(this)) R.color.battery_red
-                else R.color.battery_green
+                if (percent < highest) R.color.battery_red else R.color.battery_green
             )
         )
     }
@@ -315,7 +329,7 @@ class MainActivity : AppCompatActivity() {
         binding.monitorButton.setText(R.string.stop_monitoring)
         binding.statusText.text = getString(
             R.string.status_running,
-            AppSettings.alertThreshold(this)
+            highestThreshold(AppSettings.thresholds(this))?.level ?: 0
         )
     }
 
@@ -339,6 +353,105 @@ class MainActivity : AppCompatActivity() {
         } else {
             @Suppress("DEPRECATION")
             registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        }
+    }
+
+    /** Builds the swatch strip for one color slot and wires selection. */
+    private fun buildSwatchStrip(strip: LinearLayout, current: Int, onPick: (Int) -> Unit) {
+        strip.removeAllViews()
+        ALERT_PALETTE.forEach { color ->
+            val swatch = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(34), dp(34)).apply {
+                    marginEnd = dp(6)
+                }
+                background = swatchDrawable(color, color == current)
+                contentDescription = getString(R.string.color_swatch_desc)
+                setOnClickListener { onPick(color) }
+            }
+            strip.addView(swatch)
+        }
+    }
+
+    private fun swatchDrawable(color: Int, selected: Boolean): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(color)
+            if (selected) {
+                val strokeColor = if (isLightColor(color)) Color.BLACK else Color.WHITE
+                setStroke(dp(3), strokeColor)
+            }
+        }
+
+    private fun isLightColor(color: Int): Boolean {
+        val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+        return luminance > 0.6
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    /** One editable threshold card: holds the in-memory edits until Save. */
+    private inner class ThresholdRow(val binding: ItemThresholdBinding) {
+        var soundUri: String = ""
+        var bgColor: Int = DEFAULT_BG_COLOR
+        var fgColor: Int = DEFAULT_FG_COLOR
+
+        init {
+            binding.removeThresholdButton.setOnClickListener { removeRow(this) }
+            binding.pickSoundButton.setOnClickListener { pickSound(this) }
+            binding.removeSoundButton.setOnClickListener {
+                soundUri = ""
+                updateSoundLabel()
+            }
+            refreshSwatchStrips()
+        }
+
+        fun bind(threshold: AlertThreshold) {
+            binding.levelField.setText(threshold.level.toString())
+            binding.nameField.setText(threshold.name)
+            binding.intervalField.setText(threshold.intervalSec.toString())
+            binding.durationField.setText(threshold.durationSec.toString())
+            soundUri = threshold.soundUri
+            binding.lockScreenCheck.isChecked = threshold.lockScreen
+            binding.dndCheck.isChecked = threshold.overrideSilentDnd
+            bgColor = threshold.bgColor
+            fgColor = threshold.fgColor
+            updateSoundLabel()
+            refreshSwatchStrips()
+        }
+
+        fun updateSoundLabel() {
+            val silent = soundUri.isEmpty()
+            binding.soundValue.text = if (silent) {
+                getString(R.string.sound_silent)
+            } else {
+                try {
+                    RingtoneManager.getRingtone(this@MainActivity, Uri.parse(soundUri))
+                        ?.getTitle(this@MainActivity)
+                        ?: getString(R.string.sound_silent)
+                } catch (e: Exception) {
+                    getString(R.string.sound_silent)
+                }
+            }
+            binding.removeSoundButton.isEnabled = !silent
+        }
+
+        private fun refreshSwatchStrips() {
+            buildSwatchStrip(binding.bgSwatchStrip, bgColor) { color ->
+                bgColor = color
+                refreshSwatchStrips()
+                updatePreview()
+            }
+            buildSwatchStrip(binding.fgSwatchStrip, fgColor) { color ->
+                fgColor = color
+                refreshSwatchStrips()
+                updatePreview()
+            }
+        }
+
+        private fun updatePreview() {
+            binding.previewText.backgroundTintList = ColorStateList.valueOf(bgColor)
+            binding.previewText.setTextColor(fgColor)
+            binding.previewText.text = getString(R.string.preview_sample)
         }
     }
 }

@@ -75,6 +75,9 @@ dependencies {
 
     // Instrumented tests (run on the emulator via `gradle connectedCheck`).
     testImplementation("junit:junit:4.13.2")
+    // org.json is part of the Android platform but not of the plain JVM;
+    // provide the real implementation for the pure-logic unit tests.
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")

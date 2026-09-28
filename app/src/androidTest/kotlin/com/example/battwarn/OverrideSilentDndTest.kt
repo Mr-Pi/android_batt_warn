@@ -6,6 +6,8 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.os.ParcelFileDescriptor
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -21,10 +23,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Covers the "Play critical sound in silent / Do Not Disturb" option: the
- * default stays off, the override gate permits playback in silent/vibrate,
- * the alarm-stream attributes break the silent ringer, and the checkbox
- * round-trips through the settings UI.
+ * Covers the per-threshold "Play in silent / DND" option: the default stays
+ * off, the override gate permits playback in silent/vibrate, the alarm-stream
+ * attributes break the silent ringer, and the checkbox round-trips through the
+ * settings UI.
  */
 @RunWith(AndroidJUnit4::class)
 class OverrideSilentDndTest {
@@ -45,28 +47,28 @@ class OverrideSilentDndTest {
     @Test
     fun default_isOff() {
         assertFalse(
-            "default must preserve the honoring-silent behavior",
-            AppSettings.overrideSilentDnd(context)
+            "default thresholds must preserve the honoring-silent behavior",
+            AppSettings.DEFAULT_THRESHOLDS.any { it.overrideSilentDnd }
         )
     }
 
     @Test
     fun gate_blocksSilentOrVibrateWithoutOverride() {
-        assertFalse(shouldPlayCriticalSound(false, AudioManager.RINGER_MODE_SILENT))
-        assertFalse(shouldPlayCriticalSound(false, AudioManager.RINGER_MODE_VIBRATE))
-        assertTrue(shouldPlayCriticalSound(false, AudioManager.RINGER_MODE_NORMAL))
+        assertFalse(shouldPlayAlertSound(false, AudioManager.RINGER_MODE_SILENT))
+        assertFalse(shouldPlayAlertSound(false, AudioManager.RINGER_MODE_VIBRATE))
+        assertTrue(shouldPlayAlertSound(false, AudioManager.RINGER_MODE_NORMAL))
     }
 
     @Test
     fun gate_allowsSilentOrVibrateWithOverride() {
-        assertTrue(shouldPlayCriticalSound(true, AudioManager.RINGER_MODE_SILENT))
-        assertTrue(shouldPlayCriticalSound(true, AudioManager.RINGER_MODE_VIBRATE))
-        assertTrue(shouldPlayCriticalSound(true, AudioManager.RINGER_MODE_NORMAL))
+        assertTrue(shouldPlayAlertSound(true, AudioManager.RINGER_MODE_SILENT))
+        assertTrue(shouldPlayAlertSound(true, AudioManager.RINGER_MODE_VIBRATE))
+        assertTrue(shouldPlayAlertSound(true, AudioManager.RINGER_MODE_NORMAL))
     }
 
     @Test
     fun override_rendersAlarmAudioAttributes() {
-        val attrs = criticalSoundAlarmAttributes()
+        val attrs = alertSoundAlarmAttributes()
         assertEquals(
             "override sound must use the alarm stream to pierce the silent ringer",
             AudioAttributes.USAGE_ALARM,
@@ -79,7 +81,7 @@ class OverrideSilentDndTest {
     fun checkbox_roundTripsThroughSave() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val check = activity.findViewById<MaterialCheckBox>(R.id.override_silent_check)
+                val check = rowAt(activity, 0).findViewById<MaterialCheckBox>(R.id.dnd_check)
                 assertFalse("must start unchecked with the setting off", check.isChecked)
 
                 check.performClick()
@@ -88,22 +90,28 @@ class OverrideSilentDndTest {
         }
         assertTrue(
             "saving must persist the checked override",
-            AppSettings.overrideSilentDnd(context)
+            AppSettings.thresholds(context).first().overrideSilentDnd
         )
     }
 
     @Test
     fun checkbox_loadsSavedValue() {
-        AppSettings.prefs(context).edit()
-            .putBoolean(AppSettings.KEY_OVERRIDE_SILENT_DND, true)
-            .commit()
+        AppSettings.saveThresholds(
+            context,
+            listOf(AppSettings.DEFAULT_NEW_THRESHOLD.copy(overrideSilentDnd = true))
+        )
 
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val check = activity.findViewById<MaterialCheckBox>(R.id.override_silent_check)
+                val check = rowAt(activity, 0).findViewById<MaterialCheckBox>(R.id.dnd_check)
                 assertTrue("saved override must be reflected on load", check.isChecked)
             }
         }
+    }
+
+    private fun rowAt(activity: MainActivity, index: Int): View {
+        val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+        return container.getChildAt(index)
     }
 
     /** Runs a shell command and waits for it to finish (drains the output). */

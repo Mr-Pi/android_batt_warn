@@ -4,7 +4,11 @@ package com.example.battwarn
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.ColorDrawable
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
+import android.widget.TextView
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -19,10 +23,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Covers the "Show alert on lock screen" option: it defaults on, the gate only
- * fires for a locked device with the display already on and the overlay
- * permission granted, and the full-screen [LockScreenAlertActivity] renders
- * the message and auto-dismisses.
+ * Covers the per-threshold "Show on lock screen" option: it defaults on, the
+ * gate only fires for a locked device with the display already on and the
+ * overlay permission granted, and the full-screen [LockScreenAlertActivity]
+ * renders the message with the threshold's colors and auto-dismisses.
  *
  * The actual keyguard overlay is a platform behavior (an Activity with
  * setShowWhenLocked, permitted by SYSTEM_ALERT_WINDOW) rather than app logic,
@@ -48,7 +52,7 @@ class LockScreenAlertTest {
     fun default_isOn() {
         assertTrue(
             "lock-screen alert must be enabled by default",
-            AppSettings.showLockScreenAlert(context)
+            AppSettings.DEFAULT_THRESHOLDS.all { it.lockScreen }
         )
     }
 
@@ -67,16 +71,25 @@ class LockScreenAlertTest {
     }
 
     @Test
-    fun activity_rendersMessage() {
+    fun activity_rendersMessageAndColors() {
         val intent = Intent(context, LockScreenAlertActivity::class.java)
-            .putExtra(LockScreenAlertActivity.EXTRA_MESSAGE, "Battery critically low: 3%")
+            .putExtra(LockScreenAlertActivity.EXTRA_MESSAGE, "Battery low: 3%")
             .putExtra(LockScreenAlertActivity.EXTRA_DURATION_MS, 60_000L)
+            .putExtra(LockScreenAlertActivity.EXTRA_BG_COLOR, 0xFF0000FF.toInt())
+            .putExtra(LockScreenAlertActivity.EXTRA_FG_COLOR, 0xFFFFFF00.toInt())
 
         ActivityScenario.launch<LockScreenAlertActivity>(intent).use { scenario ->
             scenario.onActivity { activity ->
                 assertEquals(
-                    "Battery critically low: 3%",
-                    activity.findViewById<android.widget.TextView>(R.id.lock_alert_text).text.toString()
+                    "Battery low: 3%",
+                    activity.findViewById<TextView>(R.id.lock_alert_text).text.toString()
+                )
+                val bg = (activity.findViewById<View>(R.id.lock_screen_root).background as ColorDrawable).color
+                assertEquals("background must use the threshold color", 0xFF0000FF.toInt(), bg)
+                assertEquals(
+                    "text must use the threshold color",
+                    0xFFFFFF00.toInt(),
+                    activity.findViewById<TextView>(R.id.lock_alert_text).currentTextColor
                 )
             }
         }
@@ -100,7 +113,7 @@ class LockScreenAlertTest {
     fun checkbox_roundTripsThroughSave() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val check = activity.findViewById<MaterialCheckBox>(R.id.lock_screen_check)
+                val check = rowAt(activity, 0).findViewById<MaterialCheckBox>(R.id.lock_screen_check)
                 assertTrue("must start checked with the setting on by default", check.isChecked)
 
                 check.performClick()
@@ -109,22 +122,28 @@ class LockScreenAlertTest {
         }
         assertFalse(
             "saving must persist the unchecked lock-screen setting",
-            AppSettings.showLockScreenAlert(context)
+            AppSettings.thresholds(context).first().lockScreen
         )
     }
 
     @Test
     fun checkbox_loadsSavedValue() {
-        AppSettings.prefs(context).edit()
-            .putBoolean(AppSettings.KEY_LOCK_SCREEN_ALERT, false)
-            .commit()
+        AppSettings.saveThresholds(
+            context,
+            listOf(AppSettings.DEFAULT_NEW_THRESHOLD.copy(lockScreen = false))
+        )
 
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                val check = activity.findViewById<MaterialCheckBox>(R.id.lock_screen_check)
+                val check = rowAt(activity, 0).findViewById<MaterialCheckBox>(R.id.lock_screen_check)
                 assertFalse("saved (off) value must be reflected on load", check.isChecked)
             }
         }
+    }
+
+    private fun rowAt(activity: MainActivity, index: Int): View {
+        val container = activity.findViewById<ViewGroup>(R.id.thresholds_container)
+        return container.getChildAt(index)
     }
 
     private fun await(timeoutMs: Long, condition: () -> Boolean): Boolean {

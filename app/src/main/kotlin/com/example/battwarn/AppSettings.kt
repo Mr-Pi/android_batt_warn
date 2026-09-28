@@ -8,63 +8,70 @@ import android.content.Context
 object AppSettings {
     const val PREFS_NAME = "battwarn_settings"
 
-    const val KEY_ALERT_THRESHOLD = "alert_threshold"
-    const val KEY_POLL_INTERVAL_SEC = "poll_interval_sec"
-    const val KEY_TOAST_DURATION_SEC = "toast_duration_sec"
-    const val KEY_CRITICAL_THRESHOLD = "critical_threshold"
-    const val KEY_CRITICAL_INTERVAL_SEC = "critical_interval_sec"
-    const val KEY_CRITICAL_DURATION_SEC = "critical_duration_sec"
-    const val KEY_CRITICAL_SOUND_URI = "critical_sound_uri"
+    const val KEY_THRESHOLDS = "thresholds"
     const val KEY_WARN_ONLY_ON_BATTERY = "warn_only_on_battery"
-    const val KEY_OVERRIDE_SILENT_DND = "override_silent_dnd"
-    const val KEY_LOCK_SCREEN_ALERT = "lock_screen_alert"
 
-    const val DEFAULT_ALERT_THRESHOLD = 10
-    const val DEFAULT_POLL_INTERVAL_SEC = 25
-    const val DEFAULT_TOAST_DURATION_SEC = 5
-    const val DEFAULT_CRITICAL_THRESHOLD = 5
-    const val DEFAULT_CRITICAL_INTERVAL_SEC = 15
-    const val DEFAULT_CRITICAL_DURATION_SEC = 5
-    const val DEFAULT_CRITICAL_SOUND_URI = ""
     const val DEFAULT_WARN_ONLY_ON_BATTERY = true
-    const val DEFAULT_OVERRIDE_SILENT_DND = false
-    const val DEFAULT_LOCK_SCREEN_ALERT = true
+
+    /**
+     * A fresh-install baseline: a warning tier at 20% and a critical tier at
+     * 9%, matching the app's original two-tier spirit. Per the project's
+     * decision, legacy single keys are ignored (no migration); when no
+     * threshold list is stored, this list is returned.
+     */
+    val DEFAULT_THRESHOLDS: List<AlertThreshold> = listOf(
+        AlertThreshold(
+            level = 20,
+            name = "Battery low",
+            intervalSec = DEFAULT_INTERVAL_SEC,
+            durationSec = DEFAULT_DURATION_SEC,
+            soundUri = "",
+            lockScreen = true,
+            overrideSilentDnd = false,
+            bgColor = DEFAULT_BG_COLOR,
+            fgColor = DEFAULT_FG_COLOR,
+        ),
+        AlertThreshold(
+            level = 9,
+            name = "Battery critical",
+            intervalSec = 15,
+            durationSec = DEFAULT_DURATION_SEC,
+            soundUri = "",
+            lockScreen = true,
+            overrideSilentDnd = false,
+            bgColor = DEFAULT_BG_COLOR,
+            fgColor = DEFAULT_FG_COLOR,
+        ),
+    )
+
+    /** Settings for a threshold the user is about to add. */
+    val DEFAULT_NEW_THRESHOLD: AlertThreshold = AlertThreshold(
+        level = 15,
+        name = "",
+        intervalSec = DEFAULT_INTERVAL_SEC,
+        durationSec = DEFAULT_DURATION_SEC,
+        soundUri = "",
+        lockScreen = true,
+        overrideSilentDnd = false,
+        bgColor = DEFAULT_BG_COLOR,
+        fgColor = DEFAULT_FG_COLOR,
+    )
 
     fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /** Alert level in percent (0..100). */
-    fun alertThreshold(context: Context): Int =
-        prefs(context).getInt(KEY_ALERT_THRESHOLD, DEFAULT_ALERT_THRESHOLD).coerceIn(0, 100)
+    /** The configured threshold list, falling back to [DEFAULT_THRESHOLDS]. */
+    fun thresholds(context: Context): List<AlertThreshold> =
+        decodeThresholds(prefs(context).getString(KEY_THRESHOLDS, null)).ifEmpty {
+            DEFAULT_THRESHOLDS
+        }
 
-    /** Quiet pause, in milliseconds, after an alert banner closes before the next one shows. */
-    fun pollIntervalMillis(context: Context): Long =
-        prefs(context).getInt(KEY_POLL_INTERVAL_SEC, DEFAULT_POLL_INTERVAL_SEC)
-            .coerceAtLeast(1) * 1000L
-
-    /** How long each alert toast stays on screen, in milliseconds. */
-    fun toastDurationMillis(context: Context): Long =
-        prefs(context).getInt(KEY_TOAST_DURATION_SEC, DEFAULT_TOAST_DURATION_SEC)
-            .coerceAtLeast(1) * 1000L
-
-    /** Critical level in percent — always at or below the alert threshold. */
-    fun criticalThreshold(context: Context): Int =
-        prefs(context).getInt(KEY_CRITICAL_THRESHOLD, DEFAULT_CRITICAL_THRESHOLD)
-            .coerceIn(0, alertThreshold(context))
-
-    /** Quiet pause, in milliseconds, after a critical banner closes before the next one. */
-    fun criticalIntervalMillis(context: Context): Long =
-        prefs(context).getInt(KEY_CRITICAL_INTERVAL_SEC, DEFAULT_CRITICAL_INTERVAL_SEC)
-            .coerceAtLeast(1) * 1000L
-
-    /** How long each critical alert banner stays on screen, in milliseconds. */
-    fun criticalDurationMillis(context: Context): Long =
-        prefs(context).getInt(KEY_CRITICAL_DURATION_SEC, DEFAULT_CRITICAL_DURATION_SEC)
-            .coerceAtLeast(1) * 1000L
-
-    /** Ringtone URI string for the critical alert sound (empty = silent). */
-    fun criticalSoundUri(context: Context): String =
-        prefs(context).getString(KEY_CRITICAL_SOUND_URI, DEFAULT_CRITICAL_SOUND_URI) ?: ""
+    /** Persists the threshold list (already validated by the caller). */
+    fun saveThresholds(context: Context, thresholds: List<AlertThreshold>) {
+        prefs(context).edit()
+            .putString(KEY_THRESHOLDS, encodeThresholds(thresholds))
+            .apply()
+    }
 
     /**
      * True (default) pauses all warnings while the device is charging;
@@ -72,20 +79,12 @@ object AppSettings {
      */
     fun warnOnlyOnBattery(context: Context): Boolean =
         prefs(context).getBoolean(KEY_WARN_ONLY_ON_BATTERY, DEFAULT_WARN_ONLY_ON_BATTERY)
-
-    /**
-     * True makes the critical alert sound play even when the ringer is silent,
-     * on vibrate, or the device is in Do Not Disturb. False (default) honors
-     * the ringer state and plays only in RINGER_MODE_NORMAL.
-     */
-    fun overrideSilentDnd(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_OVERRIDE_SILENT_DND, DEFAULT_OVERRIDE_SILENT_DND)
-
-    /**
-     * True (default) draws the alert full-screen over the lock screen whenever
-     * the display is already on and the device is locked. The screen is never
-     * woken; with the display off the notification stays the only surface.
-     */
-    fun showLockScreenAlert(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_LOCK_SCREEN_ALERT, DEFAULT_LOCK_SCREEN_ALERT)
 }
+
+/** The threshold's name, falling back to a generic label when blank. */
+fun AlertThreshold.displayName(context: Context): String =
+    name.ifBlank { context.getString(R.string.alert_name_default) }
+
+/** Alert message prefix for a banner: "<name>: <level>%". */
+fun alertMessage(context: Context, threshold: AlertThreshold, level: Int): String =
+    context.getString(R.string.alert_message_format, threshold.displayName(context), level)
