@@ -13,6 +13,8 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.media.RingtoneManager
 import android.net.Uri
+import android.text.Editable
+import android.text.TextWatcher
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
@@ -395,6 +397,14 @@ class MainActivity : AppCompatActivity() {
         var bgColor: Int = DEFAULT_BG_COLOR
         var fgColor: Int = DEFAULT_FG_COLOR
 
+        private val previewWatcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                updatePreview()
+            }
+        }
+
         init {
             binding.removeThresholdButton.setOnClickListener { removeRow(this) }
             binding.pickSoundButton.setOnClickListener { pickSound(this) }
@@ -402,6 +412,9 @@ class MainActivity : AppCompatActivity() {
                 soundUri = ""
                 updateSoundLabel()
             }
+            // Keep the sample banner in sync with the row's name and level.
+            binding.nameField.addTextChangedListener(previewWatcher)
+            binding.levelField.addTextChangedListener(previewWatcher)
             refreshSwatchStrips()
         }
 
@@ -449,9 +462,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         private fun updatePreview() {
+            // Sample of the alert message: "<name>: <level>%", using the same
+            // format as the banner that triggers when the level drops below
+            // this threshold.
+            val name = binding.nameField.text.toString().trim()
+                .ifBlank { getString(R.string.alert_name_default) }
+            val level = binding.levelField.text.toString().toIntOrNull() ?: 0
             binding.previewText.backgroundTintList = ColorStateList.valueOf(bgColor)
             binding.previewText.setTextColor(fgColor)
-            binding.previewText.text = getString(R.string.preview_sample)
+            binding.previewText.text = getString(R.string.alert_message_format, name, level)
         }
     }
 }

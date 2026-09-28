@@ -35,7 +35,6 @@
     <string name="override_silent_dnd">Play in silent / DND</string>
     <string name="label_bg_color">Background</string>
     <string name="label_fg_color">Text</string>
-    <string name="preview_sample">Battery low: 20%</string>
     <string name="color_swatch_desc">Color swatch</string>
 
     <!-- Alert message -->

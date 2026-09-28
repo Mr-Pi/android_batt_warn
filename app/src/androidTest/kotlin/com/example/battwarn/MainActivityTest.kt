@@ -165,6 +165,50 @@ class MainActivityTest {
         }
     }
 
+    @Test
+    fun preview_textMatchesRowNameAndLevel() {
+        AppSettings.saveThresholds(
+            context,
+            listOf(
+                AppSettings.DEFAULT_NEW_THRESHOLD.copy(level = 30, name = "Urgent"),
+                AppSettings.DEFAULT_NEW_THRESHOLD.copy(level = 10, name = "Low"),
+            )
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val preview0 = rowAt(activity, 0).findViewById<TextView>(R.id.preview_text)
+                val preview1 = rowAt(activity, 1).findViewById<TextView>(R.id.preview_text)
+                assertEquals(
+                    "sample must use the row's name and level",
+                    "Urgent: 30%",
+                    preview0.text.toString()
+                )
+                assertEquals(
+                    "sample must use the row's name and level",
+                    "Low: 10%",
+                    preview1.text.toString()
+                )
+
+                // Editing the name or level must re-render the sample live.
+                val name = rowAt(activity, 0).findViewById<TextInputEditText>(R.id.name_field)
+                name.setText("Critical")
+                assertEquals(
+                    "sample must follow the edited name",
+                    "Critical: 30%",
+                    preview0.text.toString()
+                )
+                rowAt(activity, 0).findViewById<TextInputEditText>(R.id.level_field)
+                    .setText("25")
+                assertEquals(
+                    "sample must follow the edited level",
+                    "Critical: 25%",
+                    preview0.text.toString()
+                )
+            }
+        }
+    }
+
     private fun threshold(level: Int): AlertThreshold =
         AppSettings.DEFAULT_NEW_THRESHOLD.copy(level = level)
 
