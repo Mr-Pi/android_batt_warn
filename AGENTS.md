@@ -1,5 +1,11 @@
 # Batt Warn — Android battery monitor
 
+> **Hard rule — never commit without explicit instruction.**
+> Do NOT run `git commit`, `git push`, `git rebase`, or otherwise mutate
+> history unless the user explicitly asks you to. Prepare and verify work,
+> leave changes uncommitted, and report the state. If you are unsure, ask.
+> This rule is non-negotiable and applies to every session in this repo.
+
 Battery monitor for Android 9+ (minSdk 28, targetSdk 35). Runs as a
 foreground service, polls the battery only while it is below a user-configured
 set of alert levels, and shows a colored alert banner/notification on a
