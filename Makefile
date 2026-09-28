@@ -8,7 +8,7 @@ RELEASE_APK := app/build/outputs/apk/release/app-release-unsigned.apk
 PKG         := com.example.battwarn
 AVD         := test
 
-.PHONY: help shell build release install run clean uninstall devices emulator test
+.PHONY: help shell build release install run clean uninstall devices emulator test test-boot screenshots
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -52,3 +52,6 @@ test: ## Run instrumented tests (requires a running emulator)
 
 test-boot: emulator ## Boot emulator (+wait) then run instrumented tests
 	nix-shell --run 'adb wait-for-device && until [ "$$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done && gradle connectedDebugAndroidTest'
+
+screenshots: emulator ## Capture/refresh docs/screenshots from a running emulator
+	nix-shell --run 'bash scripts/screenshots.sh'
