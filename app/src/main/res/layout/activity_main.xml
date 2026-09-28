@@ -267,6 +267,19 @@
             android:textColor="@android:color/darker_gray"
             android:textSize="12sp" />
 
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/lock_screen_check"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/lock_screen_alert" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/note_lock_screen_alert"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="12sp" />
+
         <Button
             android:id="@+id/save_button"
             android:layout_width="match_parent"

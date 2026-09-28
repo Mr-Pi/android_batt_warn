@@ -44,6 +44,24 @@ the reliable alert surface.
 Some apps using `FLAG_SECURE` may block overlays; the notification remains
 available in that case.
 
+## Lock-screen alert
+
+**Show alert on lock screen** is enabled by default. When an alert fires while
+the device is locked **and the display is already on**, the warning is drawn
+full-screen over the lock screen instead of the bottom banner. Android keeps
+`TYPE_APPLICATION_OVERLAY` windows below the keyguard, so the lock-screen
+surface is a `showWhenLocked` activity rather than the usual banner.
+
+The alert is never allowed to wake the screen: if the display is off, nothing
+is shown over the lock screen and the notification remains the surface. The
+activity stays up for the tier duration, can be tapped to dismiss, and the
+quiet interval is then measured from that dismissal, exactly like the banner.
+
+Showing over the lock screen requires the “Display over other apps”
+permission: the `SYSTEM_ALERT_WINDOW` appop is what lets the foreground service
+start the full-screen activity from the background. Without it the alert falls
+back to the overlay/notification behavior above.
+
 ## Autostart and reliability
 
 The boot receiver handles device boot and package replacement. The service uses

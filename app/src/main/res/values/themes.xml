@@ -5,4 +5,7 @@
     <style name="Theme.BattWarn" parent="Theme.Material3.DayNight">
         <item name="colorPrimary">@color/battery_green</item>
     </style>
+
+    <!-- Full-bleed lock-screen alert: no app bar, just the red warning. -->
+    <style name="Theme.BattWarn.Fullscreen" parent="Theme.Material3.DayNight.NoActionBar" />
 </resources>

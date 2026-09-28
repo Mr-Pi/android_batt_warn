@@ -28,13 +28,14 @@ afterward through `scripts/test-report.sh`, producing one status line per test.
 
 ## Test coverage
 
-The emulator suite currently contains 29 tests across these classes:
+The emulator suite currently contains 36 tests across these classes:
 
 - `AlertIntervalTest` — dismissal-based duration + quiet pause cycle.
 - `BatteryDropTest` — below-alert detection and warning notification title.
 - `BootReceiverTest` — manifest contract and real boot/package-replace starts.
 - `ChargingTest` — pause while charging, resume on unplug, opt-out behavior.
 - `CriticalThresholdTest` — warning/critical split and threshold clamping.
+- `LockScreenAlertTest` — lock-screen gate, activity render/auto-dismiss, UI round-trip.
 - `MainActivityTest` — compact UI, live battery level, remove-sound behavior.
 - `OverlayAlertTest` — permission, render/hide, dismissal callback behavior.
 - `OverrideSilentDndTest` — silent/DND override gate, alarm attributes, UI round-trip.

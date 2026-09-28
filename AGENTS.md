@@ -58,7 +58,9 @@ the critical threshold, criticalThreshold clamped to alertThreshold), the
 overlay dismiss callback (fires exactly once on auto-dismiss or tap, never
 when the overlay cannot be shown), the silent/DND override (alarm-stream
 attributes + plays in silent/vibrate with the setting on, blocked without),
-and the main activity UI.
+the lock-screen alert (default on; gate requires locked + screen already on +
+overlay permission, activity renders the message and auto-dismisses), and the
+main activity UI.
 
 ## Project layout
 
@@ -69,6 +71,7 @@ app/src/main/kotlin/com/example/battwarn/
   BootReceiver.kt              # auto-start on BOOT_COMPLETED / MY_PACKAGE_REPLACED
   AppSettings.kt               # config settings (SharedPreferences) + defaults
   OverlayAlert.kt              # floating "always visible" alert banner (SYSTEM_ALERT_WINDOW)
+  LockScreenAlertActivity.kt   # full-screen warning above the lock screen (showWhenLocked)
 app/src/main/AndroidManifest.xml
 app/src/main/res/              # layout, strings, colors, theme, icons
 app/src/androidTest/kotlin/com/example/battwarn/
@@ -79,6 +82,7 @@ app/src/androidTest/kotlin/com/example/battwarn/
   CriticalThresholdTest.kt     # two-tier warning/critical split
   OverlayAlertTest.kt          # overlay permission + banner render/hide/dismiss callback
   OverrideSilentDndTest.kt     # silent/DND override setting + UI round-trip
+  LockScreenAlertTest.kt       # lock-screen gate, activity render/auto-dismiss, UI round-trip
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
 README.md                      # project overview and quick start
@@ -109,6 +113,15 @@ docs/                          # architecture, behavior, testing, screenshots
 - The alert is a floating banner (OverlayAlert) when the "Display over other
   apps" permission (SYSTEM_ALERT_WINDOW) is granted — visible even in the
   background. Without it, the notification is the fallback.
+- With `lock_screen_alert` (default on) and the overlay permission granted,
+  a warning that fires while the device is locked **and the display is
+  already on** is drawn full-screen over the lock screen by
+  `LockScreenAlertActivity` (an activity with `showWhenLocked`); the overlay
+  banner cannot show above the keyguard on Android 10+. The screen is never
+  woken, so with the display off the notification stays the only surface.
+  The `SYSTEM_ALERT_WINDOW` appop is what lets the foreground service start
+  the activity from the background (`BAL_ALLOW_SAW_PERMISSION`); without it
+  the alert falls back to the overlay/notification.
 - The main screen shows the live battery level: the activity registers for
   `ACTION_BATTERY_CHANGED` while visible and re-renders on every change.
 - The main screen is edge-to-edge (insets handled in `MainActivity`): status
@@ -130,7 +143,10 @@ docs/                          # architecture, behavior, testing, screenshots
   service also honors silent/vibrate ringers unless `override_silent_dnd` is
   on, which routes the critical sound to the alarm channel so it plays in
   silent/vibrate and typical Do Not Disturb) and `warn_only_on_battery`
-  (default on; checkbox "Warn only on battery" pauses alerts while charging).
+  (default on; checkbox "Warn only on battery" pauses alerts while charging),
+  plus `lock_screen_alert` (default on; draws the alert full-screen over the
+  lock screen while the display is already on and the device is locked —
+  requires the overlay permission and never wakes the screen).
   Validation ranges: thresholds 0-100 (critical ≤ alert); intervals and
   durations ≥ 1s with no upper cap. The service reads prefs fresh each
   poll, so saved values apply immediately.

@@ -17,6 +17,7 @@ alerts before the battery gets too low.
 - Warning and critical thresholds with independent timing settings.
 - Critical alerts can play a user-picked notification sound.
 - Floating bottom banner when “Display over other apps” is enabled.
+- Full-screen lock-screen warning (default on) while the display is already on.
 - Notification fallback with the current battery percentage.
 - Optional **Warn only on battery** mode, which pauses alerts while charging.
 - Starts after boot and package replacement.
@@ -53,7 +54,8 @@ The app asks for or uses these Android permissions:
 - `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` — keep monitoring
   reliably in the background.
 - `POST_NOTIFICATIONS` — show the foreground-service notification on Android 13+.
-- `SYSTEM_ALERT_WINDOW` — show the optional banner above other apps.
+- `SYSTEM_ALERT_WINDOW` — show the optional banner above other apps and the
+  full-screen lock-screen warning.
 - Battery-optimization exemption — requested from the Start flow to reduce Doze
   delays.
 
@@ -76,6 +78,13 @@ whether it auto-dismissed or was tapped. If the overlay permission is absent,
 the notification remains available and the fallback cycle is scheduled from the
 previous alert start.
 
+With **Show alert on lock screen** enabled (default) and the overlay permission
+granted, an alert that fires while the device is locked and the display is
+already on is drawn full-screen over the lock screen. The screen is never woken;
+with the display off the notification remains the surface. The platform only
+allows the background service to raise that full-screen activity because the
+overlay permission is granted.
+
 Warnings pause while charging when **Warn only on battery** is enabled. The
 foreground notification continues to show the current level while charging.
 
@@ -95,7 +104,7 @@ periodic background work.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 22
+- Instrumented tests: 36
 
 ## Documentation
 

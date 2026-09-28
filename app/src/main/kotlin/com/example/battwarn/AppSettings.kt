@@ -17,6 +17,7 @@ object AppSettings {
     const val KEY_CRITICAL_SOUND_URI = "critical_sound_uri"
     const val KEY_WARN_ONLY_ON_BATTERY = "warn_only_on_battery"
     const val KEY_OVERRIDE_SILENT_DND = "override_silent_dnd"
+    const val KEY_LOCK_SCREEN_ALERT = "lock_screen_alert"
 
     const val DEFAULT_ALERT_THRESHOLD = 10
     const val DEFAULT_POLL_INTERVAL_SEC = 25
@@ -27,6 +28,7 @@ object AppSettings {
     const val DEFAULT_CRITICAL_SOUND_URI = ""
     const val DEFAULT_WARN_ONLY_ON_BATTERY = true
     const val DEFAULT_OVERRIDE_SILENT_DND = false
+    const val DEFAULT_LOCK_SCREEN_ALERT = true
 
     fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -78,4 +80,12 @@ object AppSettings {
      */
     fun overrideSilentDnd(context: Context): Boolean =
         prefs(context).getBoolean(KEY_OVERRIDE_SILENT_DND, DEFAULT_OVERRIDE_SILENT_DND)
+
+    /**
+     * True (default) draws the alert full-screen over the lock screen whenever
+     * the display is already on and the device is locked. The screen is never
+     * woken; with the display off the notification stays the only surface.
+     */
+    fun showLockScreenAlert(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_LOCK_SCREEN_ALERT, DEFAULT_LOCK_SCREEN_ALERT)
 }

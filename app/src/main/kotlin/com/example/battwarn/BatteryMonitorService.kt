@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 package com.example.battwarn
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -20,8 +21,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 /**
  * Battery-respecting foreground service.
@@ -40,6 +44,9 @@ import androidx.core.app.NotificationCompat
  * (auto-dismiss or tap), so the interval is a quiet pause between alerts.
  * Without overlay permission there is no banner and thus no dismissal event;
  * the next cycle is then scheduled interval after the previous one started.
+ * While the device is locked and the display is already on, the alert is shown
+ * full-screen over the lock screen by [LockScreenAlertActivity] instead of the
+ * overlay (see [shouldShowOnLockScreen]); the screen is never woken.
  * The FGS notification is refreshed on every battery change (in both IDLE and
  * ACTIVE) so it always reflects the current level. Polling stops when the
  * battery rises back above the alert threshold or on ACTION_BATTERY_OKAY.
@@ -59,6 +66,15 @@ class BatteryMonitorService : Service() {
                 Intent.ACTION_BATTERY_LOW -> startPolling()
                 Intent.ACTION_BATTERY_OKAY -> stopPolling()
                 Intent.ACTION_BATTERY_CHANGED -> onBatteryChanged(intent)
+            }
+        }
+    }
+
+    /** The lock-screen alert closed (auto-dismiss or tap) — resume the cycle. */
+    private val lockAlertDismissReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == LockScreenAlertActivity.ACTION_LOCK_ALERT_DISMISSED) {
+                onLockAlertDismissed()
             }
         }
     }
@@ -85,6 +101,7 @@ class BatteryMonitorService : Service() {
         val suppressed = isChargingNow() && AppSettings.warnOnlyOnBattery(this)
         startForeground(NOTIFICATION_ID, buildNotification(level, threshold, criticalThreshold, suppressed))
         registerBatteryActions()
+        registerLockAlertDismissReceiver()
         if (level in 0 until threshold && !suppressed) {
             startPolling()
         }
@@ -104,9 +121,12 @@ class BatteryMonitorService : Service() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             unregisterReceiver(batteryActionReceiver)
+            unregisterReceiver(lockAlertDismissReceiver)
         } else {
             @Suppress("DEPRECATION")
             unregisterReceiver(batteryActionReceiver)
+            @Suppress("DEPRECATION")
+            unregisterReceiver(lockAlertDismissReceiver)
         }
         super.onDestroy()
     }
@@ -137,6 +157,16 @@ class BatteryMonitorService : Service() {
             @Suppress("DEPRECATION")
             registerReceiver(batteryActionReceiver, filter)
         }
+    }
+
+    /** Registers for the lock-screen alert's dismissal broadcast (in-app only). */
+    private fun registerLockAlertDismissReceiver() {
+        ContextCompat.registerReceiver(
+            this,
+            lockAlertDismissReceiver,
+            IntentFilter(LockScreenAlertActivity.ACTION_LOCK_ALERT_DISMISSED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     /** Reacts to every battery change: refresh the notification and cross into ACTIVE if low. */
@@ -189,24 +219,27 @@ class BatteryMonitorService : Service() {
         } else {
             AppSettings.toastDurationMillis(this)
         }
-
-        val posted = if (Settings.canDrawOverlays(this)) {
-            val overlay = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
-            val message = if (critical) {
-                getString(R.string.toast_battery_critical, level)
-            } else {
-                getString(R.string.toast_battery_low, level)
-            }
-            // Interval counts from the banner closing (auto or tap). If it
-            // could not be added the callback never fires, so fall back to
-            // scheduling from show time below.
-            overlay.show(message, duration) {
-                lastBannerDismissedAtMs = android.os.SystemClock.elapsedRealtime()
-                handler.removeCallbacks(pollTask)
-                handler.postDelayed(pollTask, interval)
-            }
+        val message = if (critical) {
+            getString(R.string.toast_battery_critical, level)
         } else {
-            false
+            getString(R.string.toast_battery_low, level)
+        }
+
+        val overlayGranted = Settings.canDrawOverlays(this)
+        val posted = when {
+            // Locked with the display already on: the overlay cannot show above
+            // the keyguard, so use the full-screen activity. It needs
+            // SYSTEM_ALERT_WINDOW too — that permission is what lets a
+            // foreground service start an activity from the background
+            // (BAL_ALLOW_SAW_PERMISSION). Never wakes the screen.
+            shouldShowOnLockScreen(
+                isDeviceLocked(),
+                isScreenOn(),
+                AppSettings.showLockScreenAlert(this),
+                overlayGranted
+            ) -> showLockScreenAlert(message, duration, interval)
+            overlayGranted -> showOverlayAlert(message, duration, interval)
+            else -> false
         }
 
         if (posted) {
@@ -218,6 +251,70 @@ class BatteryMonitorService : Service() {
 
         if (critical) playCriticalSound()
     }
+
+    /**
+     * Floating banner. Interval counts from the banner closing (auto or tap);
+     * returns false when the window could not be added, so the caller falls
+     * back to scheduling from show time.
+     */
+    private fun showOverlayAlert(message: String, duration: Long, interval: Long): Boolean {
+        val overlay = overlayAlert ?: OverlayAlert(this).also { overlayAlert = it }
+        return overlay.show(message, duration) {
+            lastBannerDismissedAtMs = SystemClock.elapsedRealtime()
+            handler.removeCallbacks(pollTask)
+            handler.postDelayed(pollTask, interval)
+        }
+    }
+
+    /**
+     * Full-screen alert above the lock screen, launched directly. This works
+     * only because the caller checked [Settings.canDrawOverlays]: the
+     * SYSTEM_ALERT_WINDOW appop is what lets the platform allow the background
+     * activity start from the foreground service
+     * (`BAL_ALLOW_SAW_PERMISSION`). Without it the start is silently blocked —
+     * hence the gate, which falls back to the overlay/notification.
+     * The dismissal broadcast drives the normal cadence; the extra delayed
+     * poll is a safety net for the case where no dismissal ever arrives — it
+     * keeps the cycle alive from show time (the same point the overlay's
+     * auto-dismiss+interval would land on).
+     */
+    private fun showLockScreenAlert(message: String, duration: Long, interval: Long): Boolean {
+        return try {
+            startActivity(
+                Intent(this, LockScreenAlertActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    .putExtra(LockScreenAlertActivity.EXTRA_MESSAGE, message)
+                    .putExtra(LockScreenAlertActivity.EXTRA_DURATION_MS, duration)
+            )
+            handler.removeCallbacks(pollTask)
+            handler.postDelayed(pollTask, duration + interval)
+            true
+        } catch (e: Exception) {
+            // Background activity start refused — the notification is the fallback.
+            false
+        }
+    }
+
+    /** Lock-screen alert closed (auto-dismiss or tap): pause, then next cycle. */
+    private fun onLockAlertDismissed() {
+        lastBannerDismissedAtMs = SystemClock.elapsedRealtime()
+        val critical = currentBatteryLevel() in 0 until AppSettings.criticalThreshold(this)
+        val interval = if (critical) {
+            AppSettings.criticalIntervalMillis(this)
+        } else {
+            AppSettings.pollIntervalMillis(this)
+        }
+        handler.removeCallbacks(pollTask)
+        handler.postDelayed(pollTask, interval)
+    }
+
+    /** True while the keyguard is showing (swipe or secure lock). */
+    private fun isDeviceLocked(): Boolean =
+        getSystemService(KeyguardManager::class.java).isKeyguardLocked
+
+    /** True while the display is on — the lock-screen alert never wakes it. */
+    private fun isScreenOn(): Boolean =
+        getSystemService(PowerManager::class.java).isInteractive
 
     /**
      * Plays the user-picked notification sound. By default it honors the
@@ -311,6 +408,20 @@ class BatteryMonitorService : Service() {
 /** Whether the critical sound is allowed at the given ringer mode. */
 internal fun shouldPlayCriticalSound(overrideSilentOrDnd: Boolean, ringerMode: Int): Boolean =
     overrideSilentOrDnd || ringerMode == AudioManager.RINGER_MODE_NORMAL
+
+/**
+ * Whether this alert cycle should use the full-screen lock-screen surface:
+ * the setting must be on, the keyguard must be showing, the display must
+ * already be on (the alert never wakes the screen), and SYSTEM_ALERT_WINDOW
+ * must be granted — without it the platform silently blocks the background
+ * activity start from the foreground service.
+ */
+internal fun shouldShowOnLockScreen(
+    locked: Boolean,
+    interactive: Boolean,
+    setting: Boolean,
+    overlayGranted: Boolean
+): Boolean = setting && locked && interactive && overlayGranted
 
 /**
  * Audio attributes that route the critical sound to the alarm stream, which

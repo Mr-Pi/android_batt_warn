@@ -9,6 +9,7 @@
 | `BootReceiver` | Starts the foreground service for `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` |
 | `AppSettings` | SharedPreferences keys, defaults, clamping, and persisted settings |
 | `OverlayAlert` | Bottom `TYPE_APPLICATION_OVERLAY` banner with auto/tap dismissal |
+| `LockScreenAlertActivity` | Full-screen `showWhenLocked` warning above the keyguard; auto/tap dismissal |
 
 ## State flow
 
@@ -41,6 +42,12 @@ single dismissal callback for either auto-dismiss or tap. Without overlay
 permission, the notification remains the fallback and the interval starts from
 the alert attempt.
 
+While the device is locked with the display already on, `LockScreenAlertActivity`
+is used instead of the overlay (the overlay cannot show above the keyguard). It
+reports dismissal back to the service through an in-app broadcast, so the same
+interval rule applies. This path also requires the overlay permission, which is
+what permits the background activity start (`BAL_ALLOW_SAW_PERMISSION`).
+
 ## Settings
 
 Settings are stored in `battwarn_settings`:
@@ -56,6 +63,7 @@ Settings are stored in `battwarn_settings`:
 | `critical_sound_uri` | empty | Picked notification sound; empty is silent |
 | `warn_only_on_battery` | true | Suppress warnings while AC/USB/wireless charging |
 | `override_silent_dnd` | false | Play critical sound in silent/vibrate/DND (alarm stream) |
+| `lock_screen_alert` | true | Draw the alert full-screen over the lock screen (display already on) |
 
 Intervals and durations accept values of one second or greater with no upper
 cap. Critical threshold is always clamped to the alert threshold.
