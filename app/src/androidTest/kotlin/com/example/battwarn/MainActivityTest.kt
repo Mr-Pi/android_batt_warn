@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 package com.example.battwarn
 
+import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.os.ParcelFileDescriptor
 import android.view.View
@@ -23,6 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -37,8 +40,28 @@ class MainActivityTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    @Before
+    fun setUpTest() {
+        // onCreate asks for POST_NOTIFICATIONS; without the grant the system
+        // dialog can pause the activity (dropping its battery receiver) and
+        // make the live-update test flaky. Other battery tests grant it too.
+        InstrumentationRegistry.getInstrumentation().uiAutomation.let { ui ->
+            try {
+                ui.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+            } catch (e: Exception) {
+                // Already granted.
+            }
+        }
+
+        // Installing the APK emits MY_PACKAGE_REPLACED, which auto-starts the
+        // foreground service. Stop any leftover service so the toggle starts
+        // from "Start monitoring" (isRunning is process-wide).
+        context.stopService(Intent(context, BatteryMonitorService::class.java))
+    }
+
     @After
     fun tearDown() {
+        context.stopService(Intent(context, BatteryMonitorService::class.java))
         shell("dumpsys battery reset")
         AppSettings.prefs(context).edit().clear().commit()
     }
@@ -81,12 +104,21 @@ class MainActivityTest {
 
     @Test
     fun batteryLevelUpdatesLive() {
+        // Battery intents are only emitted reliably while discharging, so
+        // force AC off before setting the level (as the other battery tests
+        // do). Set a baseline before launch so the first render is
+        // deterministic, then change it to prove the receiver is live.
+        shell("dumpsys battery set ac 0")
+        shell("dumpsys battery set level 90")
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            assertTrue("battery text did not show the initial level (${batteryState()})", await(10_000) {
+                textOf(scenario, R.id.battery_text) == "90%"
+            })
+
             // Lowering the battery emits the real ACTION_BATTERY_CHANGED
             // broadcast; the visible activity must pick it up live.
             shell("dumpsys battery set level 42")
-
-            assertTrue("battery text did not update live", await(10_000) {
+            assertTrue("battery text did not update live (${batteryState()})", await(10_000) {
                 textOf(scenario, R.id.battery_text) == "42%"
             })
         }
@@ -392,16 +424,20 @@ class MainActivityTest {
     }
 
     /** Runs a shell command and waits for it to finish (drains the output). */
-    private fun shell(cmd: String) {
+    private fun shell(cmd: String): String {
         val fd = InstrumentationRegistry.getInstrumentation().uiAutomation
             .executeShellCommand(cmd)
-        ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
-            val buffer = ByteArray(4096)
-            while (input.read(buffer) != -1) {
-                // Drain until the command completes.
-            }
+        return ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
+            input.readBytes().toString(Charsets.UTF_8)
         }
     }
+
+    /** One-line battery dump, for failure messages. */
+    private fun batteryState(): String =
+        shell("dumpsys battery")
+            .lineSequence()
+            .filter { it.contains("level:") || it.contains("powered") || it.contains("status:") }
+            .joinToString(", ") { it.trim() }
 
     private fun await(timeoutMs: Long, condition: () -> Boolean): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs

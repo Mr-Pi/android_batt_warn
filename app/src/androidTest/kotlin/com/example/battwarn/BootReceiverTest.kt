@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -25,12 +26,23 @@ class BootReceiverTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    @Before
+    fun stopLeftoverService() {
+        // isRunning is a process-wide static (no test orchestrator), so a
+        // service started by a previous test can still be alive here. Stop it
+        // and wait until it is really gone, otherwise the next start races it.
+        context.stopService(Intent(context, BatteryMonitorService::class.java))
+        await(8_000L) { !BatteryMonitorService.isRunning }
+    }
+
     @After
     fun tearDown() {
         // Ensure startForeground already ran (isRunning flips after it) to
-        // avoid the system's "did not call startForeground in time" crash.
+        // avoid the system's "did not call startForeground in time" crash,
+        // then stop and wait for the service to be gone.
         if (await(8_000L) { BatteryMonitorService.isRunning }) {
             context.stopService(Intent(context, BatteryMonitorService::class.java))
+            await(8_000L) { !BatteryMonitorService.isRunning }
         }
     }
 

@@ -4,16 +4,20 @@
 #
 # Make sure the emulator is booted: create the AVD if missing, start the
 # emulator if it is not already running, then wait (bounded) for boot.
-# Idempotent: a running emulator is reused.
+# Idempotent: a running emulator is reused. With REBOOT=1 a reused emulator is
+# rebooted first for a clean battery/SystemUI state (a freshly started one is
+# already clean, so it is not rebooted again).
 #
 # Overridable env:
 #   AVD                   (default test)
+#   REBOOT                (default 0)  reboot a reused emulator before waiting
 #   BATTWARN_EMULATOR_LOG (default /tmp/battwarn-emulator.log)
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 avd=${AVD:-test}
 log=${BATTWARN_EMULATOR_LOG:-/tmp/battwarn-emulator.log}
+reboot=${REBOOT:-0}
 
 bash "$here/ensure-avd.sh"
 
@@ -22,6 +26,10 @@ bash "$here/ensure-avd.sh"
 # matching this recipe's own command line.
 if adb devices | grep -q "^emulator-" || pgrep -f -- "[q]emu-system.*-avd $avd" >/dev/null 2>&1; then
     echo "emulator already running"
+    if [ "$reboot" = "1" ]; then
+        echo "rebooting the emulator for a clean battery/SystemUI state"
+        adb reboot
+    fi
 else
     emulator -avd "$avd" -no-window -no-audio -no-boot-anim -no-snapshot \
         -gpu swiftshader_indirect -memory 2048 -cores 4 >"$log" 2>&1 &

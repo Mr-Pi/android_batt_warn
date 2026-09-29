@@ -40,7 +40,7 @@ make devices      # adb devices
 make avd          # create the API 35 AVD "test" if it does not exist
 make emulator     # boot headless API 35 emulator (AVD "test") if not running
 make test         # gradle connectedDebugAndroidTest + per-test PASS/FAIL summary
-make test-boot    # boot emulator (waits for boot) then run instrumented tests
+make test-boot    # reboot emulator (boot it if needed) then run instrumented tests
 make screenshots  # capture/refresh docs/screenshots from a running emulator
 ```
 
@@ -51,6 +51,8 @@ The AVD is not committed (it lives in `$ANDROID_AVD_HOME` or
 `pixel_6`), printing a notice when they do. `scripts/emulator-up.sh` starts the
 emulator if needed and waits (bounded) for boot; the emulator log is
 `/tmp/battwarn-emulator.log` and its tail is shown on any boot failure.
+`make test-boot` reboots a reused emulator (`REBOOT=1`) so battery/SystemUI
+state is clean, while `make test` runs against the emulator as-is.
 
 Direct Gradle options:
 

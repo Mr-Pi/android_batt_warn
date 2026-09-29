@@ -56,8 +56,8 @@ emulator: ## Boot the API 35 headless emulator (AVD "$(AVD)") if not running
 test: ## Run instrumented tests (requires a running emulator)
 	nix-shell --run '$(RUN_TESTS)'
 
-test-boot: ## Boot emulator (+wait) then run instrumented tests
-	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; $(RUN_TESTS)'
+test-boot: ## Reboot the emulator (boot it if needed) then run instrumented tests
+	nix-shell --run 'REBOOT=1 $(AVD_ENV) bash scripts/emulator-up.sh || exit 1; $(RUN_TESTS)'
 
 screenshots: ## Capture/refresh docs/screenshots from a running emulator
 	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; bash scripts/screenshots.sh'
