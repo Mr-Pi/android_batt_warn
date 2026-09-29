@@ -23,10 +23,10 @@ mkdir -p "$OUT"
 adb wait-for-device
 echo "== reboot for a clean SystemUI state =="
 adb reboot
-adb wait-for-device
-until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
-    sleep 2
-done
+if ! bash scripts/wait-for-boot.sh; then
+    echo "emulator did not boot; aborting" >&2
+    exit 1
+fi
 sleep 10
 
 CAP_FAILURES=0

@@ -7,8 +7,17 @@ APK         := app/build/outputs/apk/debug/app-debug.apk
 RELEASE_APK := app/build/outputs/apk/release/app-release-unsigned.apk
 PKG         := com.example.battwarn
 AVD         := test
+SYS_IMG     := system-images;android-35;google_apis_playstore;x86_64
+DEVICE      := pixel_6
 
-.PHONY: help shell build release install run clean uninstall devices emulator test test-boot screenshots
+# Passed to the scripts, which also carry these as defaults.
+AVD_ENV     := AVD="$(AVD)" SYS_IMG="$(SYS_IMG)" DEVICE="$(DEVICE)"
+
+# One instrumented-test run plus the per-test PASS/FAIL summary, preserving
+# gradle's exit status. Shared by `test` and `test-boot` so they stay in sync.
+RUN_TESTS   := gradle connectedDebugAndroidTest; status=$$?; bash scripts/test-report.sh; exit $$status
+
+.PHONY: help shell build release install run clean uninstall devices avd emulator test test-boot screenshots
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -38,20 +47,18 @@ uninstall: ## Uninstall the app from device
 devices: ## List connected Android devices
 	nix-shell --run 'adb devices'
 
+avd: ## Create the API 35 AVD "$(AVD)" if it does not exist
+	nix-shell --run '$(AVD_ENV) bash scripts/ensure-avd.sh'
+
 emulator: ## Boot the API 35 headless emulator (AVD "$(AVD)") if not running
-	nix-shell --run 'if adb devices | grep -q "^emulator-"; then \
-		echo "emulator already running"; \
-	else \
-		nohup emulator -avd $(AVD) -no-window -no-audio -no-boot-anim -no-snapshot \
-			-gpu swiftshader_indirect -memory 2048 -cores 4 >/tmp/battwarn-emulator.log 2>&1 & \
-		echo "booting emulator $(AVD) (log: /tmp/battwarn-emulator.log)"; \
-	fi'
+	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh'
 
 test: ## Run instrumented tests (requires a running emulator)
-	nix-shell --run 'gradle connectedDebugAndroidTest; status=$$?; bash scripts/test-report.sh; exit $$status'
+	nix-shell --run '$(RUN_TESTS)'
 
-test-boot: emulator ## Boot emulator (+wait) then run instrumented tests
-	nix-shell --run 'adb wait-for-device && until [ "$$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done && gradle connectedDebugAndroidTest'
+test-boot: ## Boot emulator (+wait) then run instrumented tests
+	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; $(RUN_TESTS)'
 
-screenshots: emulator ## Capture/refresh docs/screenshots from a running emulator
-	nix-shell --run 'bash scripts/screenshots.sh'
+screenshots: ## Capture/refresh docs/screenshots from a running emulator
+	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; bash scripts/screenshots.sh'
+

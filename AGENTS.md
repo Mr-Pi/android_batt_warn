@@ -37,11 +37,20 @@ make install      # build + adb install to connected device
 make run          # install + start MainActivity
 make clean        # gradle clean
 make devices      # adb devices
+make avd          # create the API 35 AVD "test" if it does not exist
 make emulator     # boot headless API 35 emulator (AVD "test") if not running
 make test         # gradle connectedDebugAndroidTest + per-test PASS/FAIL summary
 make test-boot    # boot emulator (waits for boot) then run instrumented tests
 make screenshots  # capture/refresh docs/screenshots from a running emulator
 ```
+
+The AVD is not committed (it lives in `$ANDROID_AVD_HOME` or
+`$HOME/.android/avd`). `make avd`, `make emulator`, `make test-boot` and
+`make screenshots` create it on demand via `scripts/ensure-avd.sh`
+(system image `system-images;android-35;google_apis_playstore;x86_64`, device
+`pixel_6`), printing a notice when they do. `scripts/emulator-up.sh` starts the
+emulator if needed and waits (bounded) for boot; the emulator log is
+`/tmp/battwarn-emulator.log` and its tail is shown on any boot failure.
 
 Direct Gradle options:
 
@@ -107,7 +116,8 @@ NOTICE                         # third-party attributions + AI disclosure
 LICENSES/Apache-2.0.txt        # full Apache-2.0 text for the bundled libraries
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
-scripts/                       # test-report.sh, screenshots.sh
+scripts/                       # test-report.sh, screenshots.sh, ensure-avd.sh,
+                               # emulator-up.sh, wait-for-boot.sh
 README.md                      # project overview and quick start
 docs/                          # architecture, behavior, testing, screenshots
 ```

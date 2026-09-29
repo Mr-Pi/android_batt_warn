@@ -57,6 +57,11 @@ make test-boot   # boot the API 35 AVD and run instrumented tests
 make test        # run tests against an already-running emulator
 ```
 
+`make test-boot` (and `make emulator`/`make screenshots`) create the AVD on
+demand if it is missing — system image
+`system-images;android-35;google_apis_playstore;x86_64`, device `pixel_6` —
+printing a notice when they do, then boot and wait (bounded) for Android. The
+emulator log is `/tmp/battwarn-emulator.log`; its tail is printed if boot fails.
 `make test` streams Gradle failures and finishes with a per-test PASS/FAIL
 summary. See [docs/testing.md](docs/testing.md) for the full workflow.
 
