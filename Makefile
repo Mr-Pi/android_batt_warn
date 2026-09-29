@@ -17,7 +17,7 @@ AVD_ENV     := AVD="$(AVD)" SYS_IMG="$(SYS_IMG)" DEVICE="$(DEVICE)"
 # gradle's exit status. Shared by `test` and `test-boot` so they stay in sync.
 RUN_TESTS   := gradle connectedDebugAndroidTest; status=$$?; bash scripts/test-report.sh; exit $$status
 
-.PHONY: help shell build release install run clean uninstall devices avd emulator test test-boot screenshots
+.PHONY: help shell build release install run clean avd-clean clean-all uninstall devices avd emulator test test-boot screenshots
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -38,8 +38,13 @@ install: build ## Build and install debug APK to connected device
 run: install ## Install and launch the app on device
 	nix-shell --run 'adb shell am start -n $(PKG)/.MainActivity'
 
-clean: ## Clean build outputs
+clean: ## Clean build outputs (gradle clean)
 	nix-shell --run 'gradle clean'
+
+avd-clean: ## Stop the emulator and delete the AVD "$(AVD)"
+	nix-shell --run '$(AVD_ENV) bash scripts/remove-avd.sh'
+
+clean-all: clean avd-clean ## Clean build outputs and delete the AVD
 
 uninstall: ## Uninstall the app from device
 	nix-shell --run 'adb uninstall $(PKG)'

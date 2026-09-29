@@ -55,14 +55,17 @@ For emulator development:
 ```sh
 make test-boot   # reboot the API 35 AVD and run instrumented tests
 make test        # run tests against an already-running emulator
+make avd-clean   # stop the emulator and delete the AVD
 ```
 
 `make test-boot` (and `make emulator`/`make screenshots`) create the AVD on
 demand if it is missing — system image
 `system-images;android-35;google_apis_playstore;x86_64`, device `pixel_6` —
 printing a notice when they do, then boot and wait (bounded) for Android;
-`make test-boot` reboots a reused emulator for a clean battery state. The
-emulator log is `/tmp/battwarn-emulator.log`; its tail is printed if boot fails.
+`make test-boot` reboots a reused emulator for a clean battery state.
+`make avd-clean` stops the emulator and removes the AVD again (`make clean-all`
+also runs `clean`). The emulator log is `/tmp/battwarn-emulator.log`; its tail
+is printed if boot fails.
 `make test` streams Gradle failures and finishes with a per-test PASS/FAIL
 summary. See [docs/testing.md](docs/testing.md) for the full workflow.
 

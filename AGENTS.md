@@ -36,6 +36,8 @@ make release      # gradle assembleRelease (unsigned)
 make install      # build + adb install to connected device
 make run          # install + start MainActivity
 make clean        # gradle clean
+make avd-clean    # stop the emulator and delete the AVD "test"
+make clean-all    # gradle clean + avd-clean
 make devices      # adb devices
 make avd          # create the API 35 AVD "test" if it does not exist
 make emulator     # boot headless API 35 emulator (AVD "test") if not running
@@ -48,7 +50,9 @@ The AVD is not committed (it lives in `$ANDROID_AVD_HOME` or
 `$HOME/.android/avd`). `make avd`, `make emulator`, `make test-boot` and
 `make screenshots` create it on demand via `scripts/ensure-avd.sh`
 (system image `system-images;android-35;google_apis_playstore;x86_64`, device
-`pixel_6`), printing a notice when they do. `scripts/emulator-up.sh` starts the
+`pixel_6`), printing a notice when they do. `make avd-clean` stops the emulator
+and deletes it again (`scripts/remove-avd.sh`), and `make clean-all` combines
+`clean` with `avd-clean`. `scripts/emulator-up.sh` starts the
 emulator if needed and waits (bounded) for boot; the emulator log is
 `/tmp/battwarn-emulator.log` and its tail is shown on any boot failure.
 `make test-boot` reboots a reused emulator (`REBOOT=1`) so battery/SystemUI
