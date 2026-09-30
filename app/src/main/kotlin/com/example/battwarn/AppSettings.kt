@@ -11,6 +11,14 @@ object AppSettings {
     const val KEY_THRESHOLDS = "thresholds"
 
     /**
+     * Whether the user wants monitoring to run. Persisted so the service can be
+     * restored after a process kill, a reboot, or an app update without asking
+     * the user again — and so a deliberate Stop is honored rather than undone
+     * by the boot receiver or the watchdog.
+     */
+    const val KEY_MONITORING_ENABLED = "monitoringEnabled"
+
+    /**
      * A fresh-install baseline: a warning tier at 20% and a critical tier at
      * 9%, matching the app's original two-tier spirit. Per the project's
      * decision, legacy single keys are ignored (no migration); when no
@@ -62,6 +70,15 @@ object AppSettings {
         decodeThresholds(prefs(context).getString(KEY_THRESHOLDS, null)).ifEmpty {
             DEFAULT_THRESHOLDS
         }
+
+    /** True while the user wants the monitor running (survives process death). */
+    fun monitoringEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_MONITORING_ENABLED, false)
+
+    /** Records the user's Start/Stop intent (the watchdog and boot receiver honor it). */
+    fun setMonitoringEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_MONITORING_ENABLED, enabled).apply()
+    }
 
     /** Persists the threshold list (already validated by the caller). */
     fun saveThresholds(context: Context, thresholds: List<AlertThreshold>) {

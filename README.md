@@ -119,10 +119,17 @@ for details.
 
 ## Battery usage
 
-While above every threshold, the service does not poll, schedule alarms, or
-hold a wake lock. It listens for `ACTION_BATTERY_CHANGED`. Active monitoring
-only cycles while below the highest threshold; the app uses no network, GPS, or
-other periodic background work.
+While above every threshold, the service does not poll or hold a wake lock. It
+listens for `ACTION_BATTERY_CHANGED`. Active monitoring only cycles while below
+the highest threshold, with one inexact doze backstop alarm per pending cycle;
+the app uses no network, GPS, or other periodic background work.
+
+A liveness watchdog — one coarse exact alarm about every 15 minutes while
+monitoring is enabled — restarts the service if the system kills it, so a
+low-battery night cannot go silently unwatched. An explicit **Stop** cancels it,
+and the watchdog never resurrects a monitor the user stopped. The Start flow
+also asks for the battery-optimization exemption and the exact-alarm grant; the
+main screen warns while the app is still battery-restricted.
 
 ## Project status
 
@@ -130,7 +137,7 @@ other periodic background work.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 51 (plus 8 JVM unit tests)
+- Instrumented tests: 55 (plus 12 JVM unit tests)
 
 ## Documentation
 

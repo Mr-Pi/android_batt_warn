@@ -34,6 +34,13 @@ Every tier uses the same scheduling rule: the configured interval is a quiet
 pause **after** the banner closes. Tapping the banner closes it early and starts
 that pause immediately.
 
+A missed wake-up (a dismissal that never arrives, a battery broadcast that is
+throttled) must not dead-end the cycle. While the level is below a threshold the
+service always keeps a next poll pending: if none is queued it arms one, and the
+doze backstop alarm guarantees the cycle advances even with the CPU asleep.
+Turning the screen on below a threshold, or unplugging while below one, polls
+immediately rather than waiting out the quiet pause.
+
 ## Charging
 
 Each threshold carries its own **Warn only on battery** flag (default on). The
@@ -99,16 +106,37 @@ back to the overlay/notification behavior above.
 
 ## Autostart and reliability
 
-The boot receiver handles device boot and package replacement. The service uses
-`START_STICKY` and requests a battery-optimization exemption from the Start
-flow. Android force-stop is special: once force-stopped, Android will not run
-the boot receiver again until the app is manually opened.
+The boot receiver handles device boot and package replacement — but only when
+the user still wants monitoring (a deliberate **Stop** is never undone by a
+reboot). The service returns `START_STICKY` and requests a battery-optimization
+exemption from the Start flow.
+
+A foreground service can still be killed by the system (doze, memory pressure,
+an aggressive OEM battery manager), and a sticky restart is not dependable: on
+Android 12+ a restarted foreground service can be refused `startForeground()`
+and die again. A liveness watchdog covers that gap. It is an `AlarmManager`
+exact alarm (`SCHEDULE_EXACT_ALARM`) that fires roughly every 15 minutes; if the
+user still wants monitoring and the service is gone, the watchdog restarts it.
+While the app holds a pending exact alarm it is exempt from the Android 12+
+background foreground-service-start restriction, so the restart is allowed.
+The alarm is scheduled on Start/boot and re-armed on each tick; an explicit Stop
+cancels it, so the watchdog never resurrects a stopped monitor.
+
+The Start flow also keeps requesting the battery-optimization exemption, and the
+main screen shows a warning while the app is still battery-restricted. Android
+force-stop is special: once force-stopped, Android will not run the boot
+receiver or any alarm until the app is manually opened.
 
 ## Battery usage
 
-IDLE mode has no polling loop or scheduled alarm. The app listens for battery
-events and only starts the active cycle below the highest threshold. There are
-no network, GPS, or wake-lock operations.
+IDLE mode has no polling loop. The app listens for battery events and only
+starts the active cycle below the highest threshold. While ACTIVE, the normal
+cadence runs on the main-looper handler; as a doze backstop, one inexact
+`setAndAllowWhileIdle` alarm is armed per pending cycle so the CPU sleeping
+cannot silently freeze the alerts — Android throttles that alarm in deep doze,
+which is the intended battery floor. The liveness watchdog adds one coarse
+check every ~15 minutes and only while monitoring is on. There are no network,
+GPS, or wake-lock operations.
 
 ## About, licenses, and privacy
 

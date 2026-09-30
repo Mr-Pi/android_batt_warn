@@ -45,6 +45,15 @@ class AlertThresholdTest {
     }
 
     @Test
+    fun activeThresholdFor_ignoresUnknownLevels() {
+        val list = listOf(low, critical)
+        // -1 means "no reading": it must not be treated as below every tier.
+        assertNull("unknown level must select no tier", activeThresholdFor(-1, list))
+        assertNull(activeThresholdFor(101, list))
+        assertEquals(low.level, activeThresholdFor(15, list)!!.level)
+    }
+
+    @Test
     fun encodeDecode_roundTripsAndSortsDescending() {
         val json = encodeThresholds(listOf(critical, low))
         val decoded = decodeThresholds(json)

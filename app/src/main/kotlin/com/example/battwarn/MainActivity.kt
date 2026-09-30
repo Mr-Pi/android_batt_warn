@@ -3,6 +3,7 @@
 package com.example.battwarn
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -132,6 +133,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshMonitorControls()
+        refreshBatteryOptimizationHint()
     }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -313,6 +315,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startMonitoring() {
         requestNotificationPermissionIfNeeded()
+        requestExactAlarmIfNeeded()
 
         // Needed so the alert banner is visible even over other apps.
         if (!Settings.canDrawOverlays(this)) {
@@ -335,6 +338,8 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
+        AppSettings.setMonitoringEnabled(this, true)
+        MonitorWatchdog.schedule(this)
         ContextCompat.startForegroundService(
             this,
             Intent(this, BatteryMonitorService::class.java)
@@ -344,11 +349,15 @@ class MainActivity : AppCompatActivity() {
             R.string.status_running,
             highestThreshold(AppSettings.thresholds(this))?.level ?: 0
         )
+        refreshBatteryOptimizationHint()
     }
 
     private fun stopMonitoring() {
+        AppSettings.setMonitoringEnabled(this, false)
+        MonitorWatchdog.cancel(this)
         stopService(Intent(this, BatteryMonitorService::class.java))
         binding.statusText.text = getString(R.string.status_stopped)
+        refreshBatteryOptimizationHint()
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -358,6 +367,36 @@ class MainActivity : AppCompatActivity() {
         ) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    /**
+     * Exact alarms let the liveness watchdog restart monitoring promptly from
+     * the background. On Android 12+ the app asks the user to grant it; without
+     * the grant the watchdog still runs on an inexact schedule.
+     */
+    private fun requestExactAlarmIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val am = getSystemService(AlarmManager::class.java)
+            if (am != null && !am.canScheduleExactAlarms()) {
+                try {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                } catch (e: Exception) {
+                    // No settings screen on this device; the watchdog stays inexact.
+                }
+            }
+        }
+    }
+
+    /** Explains that alerts can be delayed while the app is battery-restricted. */
+    private fun refreshBatteryOptimizationHint() {
+        val pm = getSystemService(PowerManager::class.java)
+        val restricted = !pm.isIgnoringBatteryOptimizations(packageName)
+        binding.batteryOptimizationHint.visibility = if (restricted) View.VISIBLE else View.GONE
     }
 
     private fun stickyBattery(): android.content.Intent? {

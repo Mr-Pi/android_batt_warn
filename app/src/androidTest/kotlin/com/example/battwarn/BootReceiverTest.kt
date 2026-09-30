@@ -33,6 +33,8 @@ class BootReceiverTest {
         // and wait until it is really gone, otherwise the next start races it.
         context.stopService(Intent(context, BatteryMonitorService::class.java))
         await(8_000L) { !BatteryMonitorService.isRunning }
+        // The receiver honors the persisted user intent; most tests want it on.
+        AppSettings.setMonitoringEnabled(context, true)
     }
 
     @After
@@ -44,6 +46,7 @@ class BootReceiverTest {
             context.stopService(Intent(context, BatteryMonitorService::class.java))
             await(8_000L) { !BatteryMonitorService.isRunning }
         }
+        AppSettings.prefs(context).edit().clear().commit()
     }
 
     @Test
@@ -96,6 +99,17 @@ class BootReceiverTest {
         BootReceiver().onReceive(context, Intent("com.example.UNRELATED"))
         Thread.sleep(500)
         assertTrue("service must not run for unrelated action", !BatteryMonitorService.isRunning)
+    }
+
+    @Test
+    fun bootCompleted_doesNotResurrectAStoppedMonitor() {
+        AppSettings.setMonitoringEnabled(context, false)
+        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        Thread.sleep(1000)
+        assertTrue(
+            "boot must not start monitoring the user stopped",
+            !BatteryMonitorService.isRunning
+        )
     }
 
     private fun awaitRunning(timeoutMs: Long): Boolean {

@@ -42,14 +42,15 @@ runs against the emulator as-is.
 
 ## Test coverage
 
-The emulator suite currently contains 51 tests across these classes:
+The emulator suite currently contains 55 tests across these classes:
 
 - `AboutActivityTest` — in-app legal screen renders the version, privacy
   statement, MIT license, third-party notices, and the full Apache-2.0 text.
 - `AlertIntervalTest` — dismissal-based duration + quiet pause cycle.
 - `BatteryDropTest` — below-highest-threshold detection and the active tier's
   notification title.
-- `BootReceiverTest` — manifest contract and real boot/package-replace starts.
+- `BootReceiverTest` — manifest contract, real boot/package-replace starts, and
+  the stopped-monitor gate (boot never resurrects a monitor the user stopped).
 - `ChargingTest` — pause while charging, resume on unplug, opt-out behavior,
   active-tier-decides suppression across two thresholds, and the per-threshold
   "Warn only on battery" checkbox round-trip + load.
@@ -60,6 +61,9 @@ The emulator suite currently contains 51 tests across these classes:
   picked colors surviving a settings reopen, label/placeholder separation on
   empty fields, name/interval/duration round-trip through save, and save
   re-rendering the rows sorted by level descending.
+- `MonitorWatchdogTest` — the liveness watchdog restarts a dead service while
+  monitoring is enabled, leaves a deliberately stopped one alone, and never
+  restarts a live one.
 - `OverlayAlertTest` — permission, render/hide, dismissal callback behavior.
 - `OverrideSilentDndTest` — per-threshold silent/DND override gate, alarm
   attributes, UI round-trip.
@@ -69,8 +73,9 @@ The emulator suite currently contains 51 tests across these classes:
 - `ThresholdSelectionTest` — two-threshold end-to-end title flips and the pure
   selection helper.
 
-The pure model logic (active-tier selection, JSON codec, color parsing) is also
-covered by JVM unit tests in `app/src/test` (`AlertThresholdTest`, 8 tests) —
+The pure model logic (active-tier selection, JSON codec, color parsing) and the
+watchdog restart decision are also covered by JVM unit tests in `app/src/test`
+(`AlertThresholdTest`, `WatchdogDecisionTest`, 12 tests in total) —
 they run with `gradle testDebugUnitTest` and need no emulator. The unit tests use
 the `org.json` artifact because the platform's JSON classes are not available on
 the plain JVM.

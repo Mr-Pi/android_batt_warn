@@ -10,7 +10,8 @@ Battery monitor for Android 9+ (minSdk 28, targetSdk 35). Runs as a
 foreground service, polls the battery only while it is below a user-configured
 set of alert levels, and shows a colored alert banner/notification on a
 configurable interval while the level stays below the active threshold.
-Auto-starts on boot.
+Auto-starts on boot (and after an update) when the user still wants monitoring,
+and a liveness watchdog restarts it if the system kills it.
 
 ## Toolchain
 
@@ -71,10 +72,13 @@ PASS/FAIL summary parsed from the XML report (scripts/test-report.sh).
 ```
 
 Instrumented tests cover the autostart contract (BootReceiver resolves for
-BOOT_COMPLETED / MY_PACKAGE_REPLACED and starts the FGS), the FGS lifecycle
+BOOT_COMPLETED / MY_PACKAGE_REPLACED and starts the FGS, and does not resurrect
+a monitor the user stopped), the FGS lifecycle
 (isRunning + startForeground notification; the runtime POST_NOTIFICATIONS
 permission is granted via UiAutomation since API 33 blocks notification
-posting without it), threshold detection (battery dropped below the highest
+posting without it), the liveness watchdog (restarts a dead service while
+enabled; leaves a deliberately stopped one alone; never restarts a live one),
+threshold detection (battery dropped below the highest
 threshold flips the notification to the active tier's name), the overlay
 banner (SYSTEM_ALERT_WINDOW), multi-threshold selection (warning vs critical
 tier name across the lower threshold, exactly-at-boundary stays on the higher
@@ -95,6 +99,8 @@ round-trip, add/load rows), the main activity UI, and the in-app legal screen
 app/src/main/kotlin/com/example/battwarn/
   MainActivity.kt              # live battery %, Start/Stop, threshold-list settings
   BatteryMonitorService.kt     # foreground service: IDLE/ACTIVE state machine, active-tier selection
+  MonitorWatchdog.kt           # liveness watchdog: exact alarm + restart decision
+  WatchdogReceiver.kt          # watchdog alarm receiver (restarts the service if dead)
   BootReceiver.kt              # auto-start on BOOT_COMPLETED / MY_PACKAGE_REPLACED
   AppSettings.kt               # config settings (SharedPreferences) + defaults
   AlertThreshold.kt            # tier data class, JSON codec, selection helpers, color palette
@@ -105,8 +111,9 @@ app/src/main/AndroidManifest.xml
 app/src/main/res/              # layout, strings, colors, theme, icons
 app/src/main/res/layout/activity_about.xml  # About screen layout
 app/src/androidTest/kotlin/com/example/battwarn/
-  BootReceiverTest.kt          # autostart contract (manifest + receiver behavior)
+  BootReceiverTest.kt          # autostart contract (manifest + receiver behavior + stopped-monitor gate)
   ServiceSmokeTest.kt          # FGS lifecycle + notification
+  MonitorWatchdogTest.kt       # liveness watchdog restarts a dead service while enabled
   MainActivityTest.kt          # main activity UI + add/load threshold rows + remove sound
   BatteryDropTest.kt           # threshold detection end-to-end
   ThresholdSelectionTest.kt    # multi-threshold warning/critical selection
@@ -117,6 +124,7 @@ app/src/androidTest/kotlin/com/example/battwarn/
   AboutActivityTest.kt         # in-app legal screen renders version, privacy, MIT, notices, Apache-2.0
 app/src/test/kotlin/com/example/battwarn/
   AlertThresholdTest.kt        # JVM unit tests: selection, JSON codec, colors (no emulator)
+  WatchdogDecisionTest.kt      # JVM unit tests: restart decision (enabled x running)
 LICENSE                        # MIT license text (single source for the in-app copy)
 NOTICE                         # third-party attributions + AI disclosure
 LICENSES/Apache-2.0.txt        # full Apache-2.0 text for the bundled libraries
@@ -177,6 +185,23 @@ docs/                          # architecture, behavior, testing, screenshots
   flips monitoring → the active tier's name as the level crosses thresholds.
   It doubles as the alert surface when the overlay permission isn't granted
   (toasts are unreliable from the background on Android 10+ and entirely on 12+).
+- Monitoring self-heals. A foreground service can be killed and a sticky
+  restart is not dependable (Android 12+ can refuse the foreground promotion
+  after a restart). `MonitorWatchdog` arms an `AlarmManager` exact alarm
+  (`SCHEDULE_EXACT_ALARM`) about every 15 minutes while monitoring is enabled;
+  `WatchdogReceiver` restarts the service if it has died. Holding a pending
+  exact alarm is a background-foreground-service-start exemption, so the
+  restart is allowed. `onDestroy` re-arms the watchdog; an explicit Stop cancels
+  it. A persisted `monitoringEnabled` flag records the user's intent, so boot
+  and the watchdog never resurrect a monitor the user stopped.
+- While ACTIVE, a lost dismissal cannot dead-end the cycle (the pending poll is
+  tracked separately and re-armed), and one inexact `setAndAllowWhileIdle`
+  backstop alarm per cycle keeps alerts advancing with the CPU asleep in deep
+  doze. `ACTION_POWER_CONNECTED`/`DISCONNECTED` resume/pause on plug changes and
+  `ACTION_SCREEN_ON` polls immediately when the user looks at the device.
+- An unknown battery level (outside 0–100, e.g. a missing sticky broadcast) is
+  never treated as "below every threshold" and selects no tier
+  (`activeThresholdFor`).
 
 ## Configuration & conventions
 

@@ -61,6 +61,15 @@ fun activeThreshold(level: Int, thresholds: List<AlertThreshold>): AlertThreshol
 fun highestThreshold(thresholds: List<AlertThreshold>): AlertThreshold? =
     thresholds.maxByOrNull { it.level }
 
+/**
+ * The active tier for a battery reading, or null when the level is unknown
+ * (outside 0–100, e.g. a missing sticky broadcast). Guarding here keeps an
+ * unknown level from being read as "below every threshold" — `activeThreshold`
+ * alone would match every tier for `-1` and fire a false alert.
+ */
+fun activeThresholdFor(level: Int, thresholds: List<AlertThreshold>): AlertThreshold? =
+    if (level in 0..100) activeThreshold(level, thresholds) else null
+
 /** Serializes the list sorted by level descending (most severe first). */
 fun encodeThresholds(thresholds: List<AlertThreshold>): String =
     JSONArray().apply {

@@ -10,6 +10,7 @@
     <string name="status_stopped">Monitoring stopped</string>
     <string name="status_running">Monitoring battery — alert below %1$d%%</string>
     <string name="status_saved">Settings saved — alert below %1$d%%</string>
+    <string name="battery_optimization_hint">Battery optimization is on for this app. Alerts may be delayed or stopped; allow unrestricted background use in system settings.</string>
     <string name="channel_name">Battery monitor</string>
     <string name="notif_title_monitoring">Battery monitor active</string>
     <string name="notif_text_level">Battery at %1$d%%</string>

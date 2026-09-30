@@ -5,9 +5,11 @@
 | Component | Responsibility |
 | --- | --- |
 | `MainActivity` | Dynamic threshold-list settings UI, live battery percentage, permissions, per-threshold sound picker and color palette |
-| `BatteryMonitorService` | Foreground service, battery receiver, active-tier selection, notification and alert scheduling |
-| `BootReceiver` | Starts the foreground service for `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` |
-| `AppSettings` | SharedPreferences keys, defaults, threshold-list persistence, and settings accessors |
+| `BatteryMonitorService` | Foreground service, battery/power/screen receivers, active-tier selection, notification and alert scheduling, doze backstop |
+| `BootReceiver` | Starts the foreground service for `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` when monitoring is enabled |
+| `MonitorWatchdog` | Liveness watchdog: schedules the exact alarm and restarts the service when it has died while enabled |
+| `WatchdogReceiver` | Receives the watchdog alarm, restarts if needed, and re-arms the next tick |
+| `AppSettings` | SharedPreferences keys, defaults, threshold-list persistence, monitoring flag, and settings accessors |
 | `AlertThreshold` | Data class for one tier (level, name, timings, sound, flags, colors), JSON codec, and pure selection helpers |
 | `OverlayAlert` | Bottom `TYPE_APPLICATION_OVERLAY` banner with auto/tap dismissal, tinted per threshold |
 | `LockScreenAlertActivity` | Full-screen `showWhenLocked` warning above the keyguard; auto/tap dismissal; colored per threshold |
@@ -35,12 +37,28 @@ flowchart LR
 
 `ACTION_BATTERY_CHANGED` is registered dynamically. It delivers the sticky
 current value on registration and subsequent battery/plug-state changes.
+`ACTION_POWER_CONNECTED` / `ACTION_POWER_DISCONNECTED` resume or pause the cycle
+on plug changes, and `ACTION_SCREEN_ON` polls immediately when the user looks at
+the device. All three are registered dynamically while the service runs.
+
+## Liveness watchdog
+
+A foreground service can be killed and may not come back: on Android 12+ a
+sticky-restarted service can be refused the foreground promotion, and nothing
+else revives it. `MonitorWatchdog` is the safety net — an `AlarmManager` exact
+alarm (`SCHEDULE_EXACT_ALARM`) re-armed every ~15 minutes while monitoring is
+enabled. `WatchdogReceiver` restarts `BatteryMonitorService` when the persisted
+user intent says monitoring should be on but the service is not running. Holding
+a pending exact alarm is an Android 12+ exemption from the background
+foreground-service-start restriction, so the restart is permitted. `onDestroy`
+re-arms the watchdog so an unexpected death self-heals; an explicit Stop cancels
+it. See [docs/behavior.md](behavior.md) for the battery cost.
 
 ## Alert scheduling
 
 1. A battery event refreshes the foreground notification immediately.
 2. If the level is below the highest threshold, the service enters the active
-   tier ([activeThreshold]).
+   tier ([activeThresholdFor]; an unknown level selects no tier).
 3. The banner is shown for the tier duration in the tier's colors.
 4. When the banner closes, the service waits the tier interval.
 5. The next cycle reads settings and battery level again.
@@ -49,6 +67,12 @@ current value on registration and subsequent battery/plug-state changes.
 single dismissal callback for either auto-dismiss or tap. Without overlay
 permission, the notification remains the fallback and the interval starts from
 the alert attempt.
+
+The next poll is tracked separately from the ACTIVE/IDLE mode, so a lost
+dismissal cannot dead-end the cycle: while ACTIVE the service re-arms a poll if
+none is pending. Each pending poll also arms one inexact
+`setAndAllowWhileIdle` backstop alarm, so the cycle survives the CPU sleeping in
+deep doze.
 
 While the device is locked with the display already on and the active
 threshold's lock-screen flag is set, `LockScreenAlertActivity` is used instead
@@ -64,6 +88,7 @@ Settings are stored in `battwarn_settings`:
 | Key | Default | Meaning |
 | --- | ---: | --- |
 | `thresholds` | 20%/9% baseline | JSON list of user thresholds; each has `level`, `name`, `intervalSec`, `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`, `fgColor`, `warnOnlyOnBattery` |
+| `monitoringEnabled` | `false` | Persisted Start/Stop intent; honored by the boot receiver and the liveness watchdog |
 
 The fresh-install baseline is a 20% "Battery low" tier and a 9% "Battery
 critical" tier, both silent, with lock-screen display on, warn-only-on-battery
