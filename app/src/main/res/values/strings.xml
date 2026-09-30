@@ -50,6 +50,14 @@
     <!-- Save button -->
     <string name="save_settings">Save</string>
 
+    <!-- Settings import / export -->
+    <string name="import_export_settings">Import / export settings</string>
+    <string name="import_export_placeholder">[{\"level\":20},…]</string>
+    <string name="action_import">Import</string>
+    <string name="action_copy">Copy</string>
+    <string name="error_import_json">Not valid settings JSON</string>
+    <string name="status_imported">Imported — review and press Save</string>
+
     <!-- Validation errors -->
     <string name="error_level">0–100</string>
     <string name="error_interval">Seconds (≥1)</string>

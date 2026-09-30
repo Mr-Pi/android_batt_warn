@@ -5,6 +5,8 @@ package com.example.battwarn
 import android.Manifest
 import android.app.AlarmManager
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -34,6 +36,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.battwarn.databinding.ActivityMainBinding
+import com.example.battwarn.databinding.DialogImportExportBinding
 import com.example.battwarn.databinding.ItemThresholdBinding
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -48,6 +51,15 @@ class MainActivity : AppCompatActivity() {
     // instrumentation tests can interact with it directly.
     @VisibleForTesting
     internal var currentColorDialog: AlertDialog? = null
+
+    // The open import/export dialog (null while none is showing).
+    @VisibleForTesting
+    internal var currentJsonDialog: AlertDialog? = null
+
+    // The last text put on the clipboard by Copy, for instrumentation tests
+    // (the platform hides the clipboard from apps without focus).
+    @VisibleForTesting
+    internal var lastExportedJson: String? = null
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -103,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         binding.monitorButton.setOnClickListener { toggleMonitoring() }
         binding.saveButton.setOnClickListener { saveSettings() }
         binding.addThresholdButton.setOnClickListener { addRow() }
+        binding.importExportButton.setOnClickListener { showImportExport() }
         binding.aboutButton.setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
         }
@@ -168,10 +181,10 @@ class MainActivity : AppCompatActivity() {
         renderRows()
     }
 
-    private fun renderRows() {
+    private fun renderRows(list: List<AlertThreshold> = AppSettings.thresholds(this)) {
         binding.thresholdsContainer.removeAllViews()
         rows.clear()
-        AppSettings.thresholds(this).forEach { addRow(it) }
+        list.forEach { addRow(it) }
         if (rows.isEmpty()) addRow()
         updateRemoveButtons()
     }
@@ -460,6 +473,52 @@ class MainActivity : AppCompatActivity() {
             .show()
         currentColorDialog = dialog
         dialog.setOnDismissListener { currentColorDialog = null }
+    }
+
+    /**
+     * Opens the import/export dialog: a text area with the stored config JSON.
+     * Export is Copy; import loads the rows, then Save persists them. An invalid
+     * paste keeps the dialog open with an error instead of clobbering the rows.
+     */
+    private fun showImportExport() {
+        val dialogBinding = DialogImportExportBinding.inflate(layoutInflater)
+        // Show the saved config — or the fresh baseline when nothing is stored.
+        dialogBinding.importExportField.setText(encodeThresholds(AppSettings.thresholds(this)))
+
+        lateinit var dialog: AlertDialog
+        dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.import_export_settings)
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.action_import, null)
+            .setNeutralButton(R.string.action_copy, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+
+        // Listeners are attached to the shown dialog's buttons (a null builder
+        // listener keeps the dialog open; the buttons decide whether to dismiss).
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val decoded = decodeThresholds(dialogBinding.importExportField.text.toString())
+            if (decoded.isEmpty()) {
+                dialogBinding.importExportLayout.error = getString(R.string.error_import_json)
+            } else {
+                dialogBinding.importExportLayout.error = null
+                renderRows(decoded)
+                binding.statusText.text = getString(R.string.status_imported)
+                dialog.dismiss()
+            }
+        }
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+            val json = dialogBinding.importExportField.text.toString()
+            lastExportedJson = json
+            getSystemService(ClipboardManager::class.java)?.setPrimaryClip(
+                ClipData.newPlainText(getString(R.string.import_export_settings), json)
+            )
+            dialog.dismiss()
+        }
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener { dialog.dismiss() }
+
+        currentJsonDialog = dialog
+        dialog.setOnDismissListener { currentJsonDialog = null }
     }
 
     private fun isLightColor(color: Int): Boolean {

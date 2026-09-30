@@ -280,6 +280,21 @@ else
     echo "  WARN: could not open the color picker" >&2
 fi
 
+# --- import / export dialog -------------------------------------------------
+
+echo "== import / export dialog =="
+adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
+ensure_app
+scroll_top
+if tap_id_scrolling import_export_button; then
+    sleep 1
+    cap import-export
+    adb shell input keyevent 4 >/dev/null 2>&1 || true
+    sleep 1
+else
+    echo "  WARN: could not open the import/export dialog" >&2
+fi
+
 # --- lock-screen alert ------------------------------------------------------
 
 echo "== lock-screen alert =="

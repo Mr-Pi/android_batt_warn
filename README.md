@@ -23,13 +23,14 @@ alerts before the battery gets too low.
 - Full-screen lock-screen warning (default on) while the display is already on.
 - Notification fallback with the current battery percentage.
 - Starts after boot and package replacement.
+- Import / export of the threshold config as JSON from the main screen.
 - Compact light/dark UI with live battery updates, plus an in-app About screen
   showing the license texts and privacy statement.
 
 Screenshots live in [docs/screenshots](docs/screenshots/): the main screen in
 light and dark mode, the low-battery state, the floating banner, the
-notification, the About/license screen, the lock-screen warning, and the color
-picker.
+notification, the About/license screen, the lock-screen warning, the color
+picker, and the settings import/export dialog.
 
 <p align="center">
   <img src="docs/screenshots/main-low.png" width="200" alt="Batt Warn monitoring a low battery">
@@ -37,6 +38,7 @@ picker.
   <img src="docs/screenshots/about.png" width="200" alt="Batt Warn About screen with license and privacy texts">
   <img src="docs/screenshots/lock-screen.png" width="200" alt="Full-screen low-battery warning over the lock screen">
   <img src="docs/screenshots/color-picker.png" width="200" alt="Threshold color picker popup">
+  <img src="docs/screenshots/import-export.png" width="200" alt="Settings import/export dialog with the config JSON">
 </p>
 
 ## Quick start
@@ -137,7 +139,7 @@ main screen warns while the app is still battery-restricted.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 55 (plus 12 JVM unit tests)
+- Instrumented tests: 59 (plus 12 JVM unit tests)
 
 ## Documentation
 

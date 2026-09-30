@@ -21,6 +21,11 @@ Everything is provided by nix:
 nix-shell          # enter the dev environment (regenerates local.properties)
 ```
 
+**Build and test through the `make` targets** (`make build`, `make test`,
+`make test-boot`, …): they wrap `nix-shell --run`, so they work from any shell
+and keep the AVD/battery setup consistent. Call `gradle` directly only for a
+narrow, targeted run inside an existing `nix-shell`.
+
 The shell provides Gradle 8.14.4, JDK 17, the Android SDK (platform 35,
 build-tools, platform-tools, NDK r27, CMake, the API 35 AVD system image,
 and the emulator). On NixOS the shell also exports
@@ -90,14 +95,16 @@ screen already on + overlay permission, activity renders the message/colors and
 auto-dismisses), the charging suppression (the active tier's
 warn-only-on-battery flag pauses or continues alerts while plugged in), the
 threshold-list settings (fresh 20%/9% baseline, JSON
-round-trip, add/load rows), the main activity UI, and the in-app legal screen
+round-trip, add/load rows), the main activity UI, the settings import/export
+dialog (show stored JSON, copy, valid import loads rows, invalid paste errors),
+and the in-app legal screen
 (version, privacy, MIT, third-party notices, Apache-2.0).
 
 ## Project layout
 
 ```
 app/src/main/kotlin/com/example/battwarn/
-  MainActivity.kt              # live battery %, Start/Stop, threshold-list settings
+  MainActivity.kt              # live battery %, Start/Stop, threshold-list settings + import/export
   BatteryMonitorService.kt     # foreground service: IDLE/ACTIVE state machine, active-tier selection
   MonitorWatchdog.kt           # liveness watchdog: exact alarm + restart decision
   WatchdogReceiver.kt          # watchdog alarm receiver (restarts the service if dead)
@@ -115,6 +122,7 @@ app/src/androidTest/kotlin/com/example/battwarn/
   ServiceSmokeTest.kt          # FGS lifecycle + notification
   MonitorWatchdogTest.kt       # liveness watchdog restarts a dead service while enabled
   MainActivityTest.kt          # main activity UI + add/load threshold rows + remove sound
+  ImportExportTest.kt          # settings JSON dialog: show/copy/import/error
   BatteryDropTest.kt           # threshold detection end-to-end
   ThresholdSelectionTest.kt    # multi-threshold warning/critical selection
   ThresholdConfigTest.kt       # threshold list baseline, JSON round-trip, sorting, selection
@@ -223,6 +231,13 @@ docs/                          # architecture, behavior, testing, screenshots
   banner. Save validates, stores sorted by level descending, reloads the
   rows in that sorted order, and restarts the running service so new values
   apply immediately.
+- An "Import / export settings" button (above About) opens a dialog holding the
+  saved config as JSON (`dialog_import_export.xml`): Copy puts it on the
+  clipboard; Import decodes it with `decodeThresholds` and loads the rows (an
+  invalid/empty paste shows an error and keeps the dialog open). Import does
+  not persist — the user reviews the rows and presses Save, reusing the normal
+  validation. The dialog reference is exposed as `currentJsonDialog` for tests
+  (Espresso can't drive `MaterialAlertDialog`).
 - The tier model is in `AlertThreshold.kt` (pure Kotlin + org.json); the
   codec and selection helpers are JVM-unit-testable. MainActivity keeps the
   in-memory edits per row until Save.
@@ -242,6 +257,8 @@ docs/                          # architecture, behavior, testing, screenshots
 
 ## Before committing
 
+Use the `make` targets for anything that needs the toolchain or an emulator.
+
 1. `make build` — the debug APK must build.
-2. `gradle lintDebug` — no new fatal lint issues.
+2. `gradle lintDebug` — no new fatal lint issues (run inside `nix-shell`).
 3. If the app behavior changed, run `make test` (emulator + instrumented tests).

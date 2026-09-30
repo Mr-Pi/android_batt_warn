@@ -66,6 +66,16 @@ Not Disturb. It routes the tone to the alarm stream, which Android does not mute
 with a silent ringer and exempts from typical DND. The one case it cannot pierce
 is a DND rule configured to silence alarms as well.
 
+## Import / export
+
+**Import / export settings** (above About) opens a dialog with the saved
+configuration as JSON — the same array stored under the `thresholds` key, or the
+fresh 20%/9% baseline when nothing has been saved yet. **Copy** puts it on the
+clipboard. Paste a config back and press **Import** to load it into the rows;
+**Save** then persists it, exactly like hand-edited rows. An invalid paste stays
+in the dialog with an error and leaves the rows untouched. Unsaved row edits are
+not part of the exported JSON.
+
 ## Colors
 
 Each threshold's background and text colors are chosen from a preset palette

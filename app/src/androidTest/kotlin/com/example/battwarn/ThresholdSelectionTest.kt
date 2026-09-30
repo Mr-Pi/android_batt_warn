@@ -32,9 +32,12 @@ class ThresholdSelectionTest {
     @After
     fun tearDown() {
         // Ensure startForeground already ran (isRunning flips after it) to
-        // avoid the system's "did not call startForeground in time" crash.
+        // avoid the system's "did not call startForeground in time" crash,
+        // then wait for the service to be really gone so the next test does not
+        // race a still-live instance publishing a stale notification title.
         if (await(8_000L) { BatteryMonitorService.isRunning }) {
             context.stopService(Intent(context, BatteryMonitorService::class.java))
+            await(8_000L) { !BatteryMonitorService.isRunning }
         }
         shell("dumpsys battery reset")
         AppSettings.prefs(context).edit().clear().commit()

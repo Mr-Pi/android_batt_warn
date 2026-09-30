@@ -42,7 +42,7 @@ runs against the emulator as-is.
 
 ## Test coverage
 
-The emulator suite currently contains 55 tests across these classes:
+The emulator suite currently contains 59 tests across these classes:
 
 - `AboutActivityTest` — in-app legal screen renders the version, privacy
   statement, MIT license, third-party notices, and the full Apache-2.0 text.
@@ -54,6 +54,9 @@ The emulator suite currently contains 55 tests across these classes:
 - `ChargingTest` — pause while charging, resume on unplug, opt-out behavior,
   active-tier-decides suppression across two thresholds, and the per-threshold
   "Warn only on battery" checkbox round-trip + load.
+- `ImportExportTest` — the JSON dialog shows the stored config, Copy fills the
+  clipboard, a valid paste loads the rows (and Save persists them), and an
+  invalid paste errors without clobbering the rows.
 - `LockScreenAlertTest` — lock-screen gate, activity render/colors/auto-dismiss,
   UI round-trip.
 - `MainActivityTest` — compact UI, live battery level, add/load threshold rows,

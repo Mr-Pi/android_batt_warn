@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Batt Warn authors -->
+<!-- SPDX-License-Identifier: MIT -->
+<com.google.android.material.textfield.TextInputLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/import_export_layout"
+    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp"
+    app:expandedHintEnabled="false"
+    app:placeholderText="@string/import_export_placeholder">
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/import_export_field"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="monospace"
+        android:gravity="top|start"
+        android:inputType="textMultiLine|textNoSuggestions"
+        android:maxLines="12"
+        android:minLines="6"
+        android:scrollbars="vertical"
+        android:textSize="12sp" />
+</com.google.android.material.textfield.TextInputLayout>
