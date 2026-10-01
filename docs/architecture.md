@@ -46,13 +46,26 @@ the device. All three are registered dynamically while the service runs.
 A foreground service can be killed and may not come back: on Android 12+ a
 sticky-restarted service can be refused the foreground promotion, and nothing
 else revives it. `MonitorWatchdog` is the safety net — an `AlarmManager` exact
-alarm (`SCHEDULE_EXACT_ALARM`) re-armed every ~15 minutes while monitoring is
-enabled. `WatchdogReceiver` restarts `BatteryMonitorService` when the persisted
-user intent says monitoring should be on but the service is not running. Holding
-a pending exact alarm is an Android 12+ exemption from the background
-foreground-service-start restriction, so the restart is permitted. `onDestroy`
-re-arms the watchdog so an unexpected death self-heals; an explicit Stop cancels
-it. See [docs/behavior.md](behavior.md) for the battery cost.
+alarm re-armed every ~15 minutes while monitoring is enabled, declared with
+`USE_EXACT_ALARM` (+ `SCHEDULE_EXACT_ALARM` for API 31/32) so the exact-alarm
+right is auto-granted on Android 13+ and recovery needs no user interaction.
+`WatchdogReceiver` runs one tick:
+
+- service gone + enabled → restart it (holding a pending exact alarm is an
+  Android 12+ exemption from the background foreground-service-start
+  restriction, so the restart is permitted);
+- service alive → send `ACTION_REFRESH`: `BatteryMonitorService` re-posts the
+  notification from the sticky battery (bounded staleness even with every
+  broadcast lost) and repairs the cadence if no poll is pending.
+
+`onDestroy` re-arms the watchdog so an unexpected death self-heals; an explicit
+Stop cancels it. A refused `startForeground()` inside the service stops it
+cleanly — Android enforces a promotion timeout for a service started with
+`startForegroundService()` that never successfully promotes — and the
+alarm-exempt watchdog revives it within one tick. The persisted
+`monitoringEnabled` flag records the
+user's intent; boot and the watchdog honor it. See
+[docs/behavior.md](behavior.md) for the battery cost.
 
 ## Alert scheduling
 
@@ -70,9 +83,12 @@ the alert attempt.
 
 The next poll is tracked separately from the ACTIVE/IDLE mode, so a lost
 dismissal cannot dead-end the cycle: while ACTIVE the service re-arms a poll if
-none is pending. Each pending poll also arms one inexact
-`setAndAllowWhileIdle` backstop alarm, so the cycle survives the CPU sleeping in
-deep doze.
+none is pending, and a duration + interval safety net is armed *before* the
+banner shows (the real dismissal replaces it with the exact interval). Each
+pending poll also arms one inexact `setAndAllowWhileIdle` backstop alarm, so
+the cycle survives the CPU sleeping in deep doze. The charging pause and the
+unknown-level state are bounded self-re-arming re-checks rather than hard
+stops.
 
 While the device is locked with the display already on and the active
 threshold's lock-screen flag is set, `LockScreenAlertActivity` is used instead

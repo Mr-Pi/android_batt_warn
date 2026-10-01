@@ -55,6 +55,15 @@ import androidx.core.content.ContextCompat
  * Polling stops when the battery rises back above the highest threshold or on
  * ACTION_BATTERY_OKAY.
  *
+ * The service assumes it must never stay down while the user wants monitoring:
+ * [MonitorWatchdog]'s tick restarts it when dead, or sends [ACTION_REFRESH]
+ * when alive (re-posting the notification from the sticky battery and repairing
+ * a lost cadence). A refused foreground promotion stops the service cleanly —
+ * the platform enforces a promotion timeout anyway — and the alarm-exempt
+ * watchdog revives it. The charging pause and unknown-level
+ * states keep a bounded self-armed re-check so recovery never depends solely on
+ * broadcasts arriving.
+ *
  * All thresholds/timings are read from SharedPreferences (see [AppSettings]).
  */
 class BatteryMonitorService : Service() {
@@ -121,9 +130,11 @@ class BatteryMonitorService : Service() {
             if (level !in 0..100) {
                 // A malformed/missing sticky broadcast must not be read as
                 // "below every threshold" — that used to fire false alerts.
+                // Always re-arm the re-check: a one-shot fallback would make
+                // recovery depend entirely on broadcasts arriving.
                 Log.w(TAG, "battery level unknown; rechecking later")
                 updateNotification(level, null, false)
-                if (polling) scheduleNextPoll(UNKNOWN_LEVEL_RECHECK_MS) else stopPolling()
+                scheduleNextPoll(unknownLevelRecheckMs)
                 return
             }
             val threshold = activeThreshold(level, AppSettings.thresholds(this@BatteryMonitorService))
@@ -131,8 +142,12 @@ class BatteryMonitorService : Service() {
             updateNotification(level, threshold, suppressed)
             when {
                 suppressed -> {
-                    Log.i(TAG, "ACTIVE suppressed (charging + warn-only) at $level%")
-                    stopPolling()
+                    // Charging pause: keep a slow bounded re-check alive so a
+                    // lost unplug broadcast cannot end the monitoring.
+                    Log.i(TAG, "ACTIVE suppressed (charging + warn-only) at $level% — rechecking later")
+                    polling = false
+                    suppressedRechecks++
+                    scheduleNextPoll(suppressedRecheckMs)
                 }
                 threshold != null -> showLowBatteryAlert(level, threshold)
                 else -> {
@@ -143,35 +158,61 @@ class BatteryMonitorService : Service() {
         }
     }
 
+    /**
+     * Posts the foreground notification from the current sticky battery. Also
+     * runs on every watchdog refresh tick (an already-promoted service may
+     * freely re-call `startForeground()` to update its notification).
+     *
+     * A refused promotion on the *initial* start is fatal for this process
+     * anyway (Android crashes services that were started with
+     * `startForegroundService()` but never successfully promoted), so we stop
+     * cleanly — keeping the user's monitoring intent — and the watchdog, which
+     * holds the exact-alarm exemption, revives us on its next tick.
+     */
+    private fun tryStartForeground(): Boolean {
+        val level = currentBatteryLevel()
+        val threshold = activeThresholdFor(level, AppSettings.thresholds(this))
+        val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
+        return try {
+            startForeground(NOTIFICATION_ID, buildNotification(level, threshold, suppressed))
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground refused ($e) — stopping; the watchdog will revive monitoring", e)
+            MonitorWatchdog.schedule(this)
+            stopSelf()
+            false
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand action=${intent?.action} startId=$startId")
         createNotificationChannel()
+        // A refused promotion stops the service and returns without touching
+        // the cadence; the watchdog (alarm-exempt) revives it.
+        if (!tryStartForeground()) {
+            return START_NOT_STICKY
+        }
+        registerReceivers()
+
+        // Idempotent and self-repairing: a refresh tick for an already-running
+        // service only re-posts the notification (above) and repairs the
+        // cadence below (startPolling re-arms only when none is pending).
         val thresholds = AppSettings.thresholds(this)
         val level = currentBatteryLevel()
         val threshold = activeThresholdFor(level, thresholds)
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
-
-        // A restarted service on Android 12+ can be refused the foreground
-        // promotion; catch it, log it, and let the watchdog try again rather
-        // than crashing the process.
-        try {
-            startForeground(NOTIFICATION_ID, buildNotification(level, threshold, suppressed))
-        } catch (e: Exception) {
-            Log.e(TAG, "startForeground refused ($e) — deferring to the watchdog")
-            MonitorWatchdog.schedule(this)
-            stopSelf()
-            return START_NOT_STICKY
-        }
-
-        registerReceivers()
         val highest = highestThreshold(thresholds)
         when {
             suppressed -> {
-                Log.i(TAG, "started while charging + warn-only; watchdog will recheck")
-                scheduleNextPoll(SUPPRESSED_RECHECK_MS)
+                Log.i(TAG, "running while charging + warn-only at $level%; bounded re-check armed")
+                scheduleNextPoll(suppressedRecheckMs)
+            }
+            level !in 0..100 -> {
+                Log.w(TAG, "running with unknown level; re-check armed")
+                scheduleNextPoll(unknownLevelRecheckMs)
             }
             highest != null && level in 0 until highest.level -> startPolling()
-            else -> Log.i(TAG, "started IDLE at $level%")
+            else -> Log.i(TAG, "IDLE at $level%")
         }
         isRunning = true
         return START_STICKY
@@ -319,9 +360,10 @@ class BatteryMonitorService : Service() {
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
         updateNotification(level, threshold, suppressed)
         when {
-            // Charging with the active tier's warn-only flag on: pause — also
-            // cancels a pending post-dismiss poll from an already-running cycle.
-            suppressed -> stopPolling()
+            // Charging with the active tier's warn-only flag on: pause the
+            // alerts but keep the bounded re-check armed, so a lost unplug
+            // broadcast can never end the monitoring.
+            suppressed -> enterSuppressedPause()
             threshold != null -> startPolling()
             else -> stopPolling()
         }
@@ -335,10 +377,20 @@ class BatteryMonitorService : Service() {
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
         updateNotification(level, threshold, suppressed)
         when {
-            suppressed -> stopPolling()
+            suppressed -> enterSuppressedPause()
             threshold != null -> pollNow()
             else -> stopPolling()
         }
+    }
+
+    /**
+     * The charging pause: alerts stop, but the next poll stays armed as a slow
+     * re-check (unlike [stopPolling], which is the real exit to IDLE where
+     * broadcasts are the entry trigger).
+     */
+    private fun enterSuppressedPause() {
+        polling = false
+        if (!pollScheduled) scheduleNextPoll(suppressedRecheckMs)
     }
 
     /** The screen just came on: the user is looking, so poll now rather than wait. */
@@ -380,6 +432,12 @@ class BatteryMonitorService : Service() {
         val duration = threshold.durationSec * 1000L
         val message = alertMessage(this, threshold, level)
 
+        // Safety net armed *before* showing: if a dismissal ever fails to
+        // report back (lost callback, wedged window), the cycle advances after
+        // duration + interval anyway. The real dismissal replaces this with a
+        // poll at exactly the interval.
+        scheduleNextPoll(duration + interval)
+
         val overlayGranted = Settings.canDrawOverlays(this)
         val posted = when {
             // Locked with the display already on: the overlay cannot show above
@@ -392,7 +450,7 @@ class BatteryMonitorService : Service() {
                 isScreenOn(),
                 threshold.lockScreen,
                 overlayGranted
-            ) -> showLockScreenAlert(message, duration, interval, threshold.bgColor, threshold.fgColor)
+            ) -> showLockScreenAlert(message, duration, threshold.bgColor, threshold.fgColor)
             overlayGranted -> showOverlayAlert(message, duration, interval, threshold.bgColor, threshold.fgColor)
             else -> false
         }
@@ -435,16 +493,13 @@ class BatteryMonitorService : Service() {
      * SYSTEM_ALERT_WINDOW appop is what lets the platform allow the background
      * activity start from the foreground service
      * (`BAL_ALLOW_SAW_PERMISSION`). Without it the start is silently blocked —
-     * hence the gate, which falls back to the overlay/notification.
-     * The dismissal broadcast drives the normal cadence; the extra delayed
-     * poll is a safety net for the case where no dismissal ever arrives — it
-     * keeps the cycle alive from show time (the same point the overlay's
-     * auto-dismiss+interval would land on).
+     * hence the gate, which falls back to the overlay/notification. The
+     * dismissal broadcast drives the normal cadence; the caller's pre-armed
+     * duration + interval safety net covers a lost dismissal.
      */
     private fun showLockScreenAlert(
         message: String,
         duration: Long,
-        interval: Long,
         bgColor: Int,
         fgColor: Int
     ): Boolean {
@@ -457,10 +512,6 @@ class BatteryMonitorService : Service() {
                     .putExtra(LockScreenAlertActivity.EXTRA_BG_COLOR, bgColor)
                     .putExtra(LockScreenAlertActivity.EXTRA_FG_COLOR, fgColor)
             )
-            handler.removeCallbacks(pollTask)
-            handler.postDelayed(pollTask, duration + interval)
-            pollScheduled = true
-            scheduleDozeBackstop(duration + interval)
             true
         } catch (e: Exception) {
             // Background activity start refused — the notification is the fallback.
@@ -553,7 +604,7 @@ class BatteryMonitorService : Service() {
 
     companion object {
         const val CHANNEL_ID = "battery_monitor"
-        private const val NOTIFICATION_ID = 1
+        internal const val NOTIFICATION_ID = 1
         private const val TAG = "BattWarn"
 
         /** Extra slack so the backstop lands after the handler's own wake-up. */
@@ -563,9 +614,19 @@ class BatteryMonitorService : Service() {
         /** Internal broadcast action for the doze backstop alarm. */
         const val ACTION_DOZE_BACKSTOP = "com.example.battwarn.DOZE_BACKSTOP"
 
-        /** Re-check cadence while an unknown level or charging suppression applies. */
-        private const val UNKNOWN_LEVEL_RECHECK_MS = 60_000L
-        private const val SUPPRESSED_RECHECK_MS = 15 * 60_000L
+        /** Watchdog tick while alive: re-post the notification + repair cadence. */
+        const val ACTION_REFRESH = "com.example.battwarn.REFRESH"
+
+        /** Re-check cadence while charging suppression or an unknown level applies. */
+        internal var suppressedRecheckMs = 15 * 60_000L
+        internal var unknownLevelRecheckMs = 60_000L
+
+        /**
+         * Suppressed-mode bounded re-checks performed (test hook: proves the
+         * charging pause keeps re-arming instead of dead-ending after one).
+         */
+        @Volatile
+        internal var suppressedRechecks = 0L
 
         /** True while this service is running (used by MainActivity on save). */
         @Volatile

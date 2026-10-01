@@ -52,7 +52,9 @@ while still below a threshold resumes the first alert immediately.
 Because only the active tier governs, a threshold with the flag off keeps
 warning while charging — for example, a 60% tier with the flag off warns from
 60% down to 50%, while a 50% tier with the flag on silences the alerts below
-50% while charging.
+50% while charging. During the pause the service keeps a slow self-armed
+re-check running (15 minutes), so even a lost unplug broadcast resumes the
+alerts instead of ending them.
 
 ## Alert sound
 
@@ -124,18 +126,32 @@ exemption from the Start flow.
 A foreground service can still be killed by the system (doze, memory pressure,
 an aggressive OEM battery manager), and a sticky restart is not dependable: on
 Android 12+ a restarted foreground service can be refused `startForeground()`
-and die again. A liveness watchdog covers that gap. It is an `AlarmManager`
-exact alarm (`SCHEDULE_EXACT_ALARM`) that fires roughly every 15 minutes; if the
-user still wants monitoring and the service is gone, the watchdog restarts it.
-While the app holds a pending exact alarm it is exempt from the Android 12+
-background foreground-service-start restriction, so the restart is allowed.
-The alarm is scheduled on Start/boot and re-armed on each tick; an explicit Stop
-cancels it, so the watchdog never resurrects a stopped monitor.
+and die again. A liveness watchdog covers that gap **automatically, with no
+user interaction**:
 
-The Start flow also keeps requesting the battery-optimization exemption, and the
-main screen shows a warning while the app is still battery-restricted. Android
-force-stop is special: once force-stopped, Android will not run the boot
-receiver or any alarm until the app is manually opened.
+- An `AlarmManager` exact alarm (`SCHEDULE_EXACT_ALARM` + `USE_EXACT_ALARM` —
+  the latter is auto-granted on Android 13+, so recovery works out of the box
+  even where Android 14+ no longer grants the exact-alarm right by default)
+  fires about every 15 minutes while monitoring is enabled.
+- Each tick: if the service died, it is restarted. Holding a pending exact
+  alarm is an Android 12+ exemption from the background
+  foreground-service-start restriction, so the restart is permitted. If the
+  service is alive, the tick sends a refresh: the notification is re-posted
+  from the sticky battery (worst-case staleness one tick, even if every
+  broadcast were dropped) and a lost alert cadence is repaired.
+- `onDestroy` re-arms the watchdog, so an unexpected death self-heals; an
+  explicit Stop cancels it. A refused foreground promotion stops the service
+  cleanly (Android enforces a promotion timeout regardless), and the
+  alarm-exempt watchdog revives it within one tick — the user's monitoring
+  intent is preserved, so the notification always comes back.
+- The charging pause and unknown-level states keep a slow self-armed re-check
+  running, so resuming never depends solely on plug/unplug broadcasts.
+
+The Start flow also keeps requesting the battery-optimization exemption, and
+the main screen shows a warning while the app is still battery-restricted.
+Android force-stop is special: once force-stopped, Android will not run the
+boot receiver or any alarm until the app is manually opened — no app can
+survive that, by OS design.
 
 ## Battery usage
 
@@ -144,9 +160,10 @@ starts the active cycle below the highest threshold. While ACTIVE, the normal
 cadence runs on the main-looper handler; as a doze backstop, one inexact
 `setAndAllowWhileIdle` alarm is armed per pending cycle so the CPU sleeping
 cannot silently freeze the alerts — Android throttles that alarm in deep doze,
-which is the intended battery floor. The liveness watchdog adds one coarse
-check every ~15 minutes and only while monitoring is on. There are no network,
-GPS, or wake-lock operations.
+which is the intended battery floor. The liveness watchdog adds one exact
+wake-up every ~15 minutes (a few milliseconds of work; notification re-post +
+boolean checks) and only while monitoring is on. There are no network, GPS, or
+wake-lock operations.
 
 ## About, licenses, and privacy
 

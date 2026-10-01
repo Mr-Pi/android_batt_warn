@@ -23,10 +23,15 @@ import androidx.core.content.ContextCompat
  * It is an [AlarmManager] exact alarm: when it fires, the app holds a pending
  * exact alarm, which is an explicit exemption from the Android 12+ background
  * foreground-service-start restriction, so [WatchdogReceiver] can legally
- * (re)start the service. The check itself is a cheap boolean + static read, and
- * the alarm is coarse (see [WATCHDOG_INTERVAL_MS]) and only scheduled while the
- * user wants monitoring on, so it costs one wake-up every fifteen minutes at
- * most and never during an explicit Stop.
+ * (re)start the service. `USE_EXACT_ALARM` is declared so the exact-alarm right
+ * is auto-granted on Android 13+ — recovery never needs user interaction.
+ * Each tick either restarts a dead service or — while it is alive — sends
+ * `ACTION_REFRESH` so the service re-posts its notification with the actual
+ * battery level (bounded staleness) and repairs a lost cadence. The check
+ * itself is a cheap boolean + static read, and the alarm is coarse (see
+ * [WATCHDOG_INTERVAL_MS]) and only scheduled while the user wants monitoring
+ * on, so it costs one wake-up every fifteen minutes at most and never during
+ * an explicit Stop.
  *
  * Scheduled on Start/boot and re-armed by each receipt; cancelled on Stop.
  */
@@ -73,20 +78,29 @@ object MonitorWatchdog {
     }
 
     /**
-     * One watchdog tick: if the user still wants monitoring but the service is
-     * not running, restart it. Returns true when a restart was attempted, so
-     * the decision is testable without an alarm.
+     * One watchdog tick: while the user wants monitoring, the service must be
+     * running with a current notification. Alive: send `ACTION_REFRESH`, which
+     * re-posts the notification with the actual sticky battery level and
+     * repairs a lost cadence. Gone: restart it. Returns true when a restart
+     * was attempted (the "tick acted" signal the tests observe).
      */
     fun ensureMonitoring(context: Context): Boolean {
-        if (!shouldRestart(
-                AppSettings.monitoringEnabled(context),
-                BatteryMonitorService.isRunning
-            )
-        ) {
-            if (!AppSettings.monitoringEnabled(context)) {
-                Log.i(TAG, "watchdog: monitoring disabled, nothing to do")
-            } else {
-                Log.i(TAG, "watchdog: service is alive")
+        if (!AppSettings.monitoringEnabled(context)) {
+            Log.i(TAG, "watchdog: monitoring disabled, nothing to do")
+            return false
+        }
+        if (BatteryMonitorService.isRunning) {
+            Log.i(TAG, "watchdog: service is alive — refreshing the notification")
+            try {
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, BatteryMonitorService::class.java)
+                        .setAction(BatteryMonitorService.ACTION_REFRESH)
+                )
+            } catch (e: Exception) {
+                // Should not happen (a live FGS exempts the app); log and let
+                // the next tick try again.
+                Log.w(TAG, "watchdog refresh failed: $e")
             }
             return false
         }
@@ -107,7 +121,10 @@ object MonitorWatchdog {
     /** The watchdog only acts when the user wants monitoring but it is not running. */
     fun shouldRestart(enabled: Boolean, running: Boolean): Boolean = enabled && !running
 
-    /** Exact alarms need the SCHEDULE_EXACT_ALARM grant on API 31+. */
+    /**
+     * Exact alarms need the SCHEDULE_EXACT_ALARM right on API 31+; the declared
+     * USE_EXACT_ALARM grants it automatically on API 33+ (no user interaction).
+     */
     private fun canScheduleExact(alarmManager: AlarmManager): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 

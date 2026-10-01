@@ -42,7 +42,7 @@ runs against the emulator as-is.
 
 ## Test coverage
 
-The emulator suite currently contains 59 tests across these classes:
+The emulator suite currently contains 62 tests across these classes:
 
 - `AboutActivityTest` — in-app legal screen renders the version, privacy
   statement, MIT license, third-party notices, and the full Apache-2.0 text.
@@ -65,8 +65,10 @@ The emulator suite currently contains 59 tests across these classes:
   empty fields, name/interval/duration round-trip through save, and save
   re-rendering the rows sorted by level descending.
 - `MonitorWatchdogTest` — the liveness watchdog restarts a dead service while
-  monitoring is enabled, leaves a deliberately stopped one alone, and never
-  restarts a live one.
+  monitoring is enabled, leaves a deliberately stopped one alone, does not
+  restart a live one but re-posts its notification on a tick, the manifest
+  declares the exact-alarm permissions, and the charging pause keeps re-arming
+  its bounded re-check.
 - `OverlayAlertTest` — permission, render/hide, dismissal callback behavior.
 - `OverrideSilentDndTest` — per-threshold silent/DND override gate, alarm
   attributes, UI round-trip.

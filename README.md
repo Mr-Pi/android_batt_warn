@@ -127,11 +127,17 @@ the highest threshold, with one inexact doze backstop alarm per pending cycle;
 the app uses no network, GPS, or other periodic background work.
 
 A liveness watchdog — one coarse exact alarm about every 15 minutes while
-monitoring is enabled — restarts the service if the system kills it, so a
-low-battery night cannot go silently unwatched. An explicit **Stop** cancels it,
-and the watchdog never resurrects a monitor the user stopped. The Start flow
-also asks for the battery-optimization exemption and the exact-alarm grant; the
-main screen warns while the app is still battery-restricted.
+monitoring is enabled — keeps monitoring alive automatically, with **no user
+interaction**: it restarts the service if the system kills it, and while the
+service lives each tick re-posts the notification from the actual battery level
+and repairs a lost alert cadence, so a low-battery night cannot go silently
+unwatched. `USE_EXACT_ALARM` is declared so the exact-alarm right is
+auto-granted on Android 13+ (Android 14+ no longer grants the ordinary exact
+permission by default). An explicit **Stop** cancels the watchdog, and it never
+resurrects a monitor the user stopped. The Start flow also asks for the
+battery-optimization exemption; the main screen warns while the app is still
+battery-restricted. (A user force-stop is the one thing no app survives — the
+OS blocks every restart path until the app is opened again.)
 
 ## Project status
 
@@ -139,7 +145,7 @@ main screen warns while the app is still battery-restricted.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 59 (plus 12 JVM unit tests)
+- Instrumented tests: 62 (plus 12 JVM unit tests)
 
 ## Documentation
 

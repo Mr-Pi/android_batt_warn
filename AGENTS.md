@@ -82,7 +82,10 @@ a monitor the user stopped), the FGS lifecycle
 (isRunning + startForeground notification; the runtime POST_NOTIFICATIONS
 permission is granted via UiAutomation since API 33 blocks notification
 posting without it), the liveness watchdog (restarts a dead service while
-enabled; leaves a deliberately stopped one alone; never restarts a live one),
+enabled; leaves a deliberately stopped one alone; never restarts a live one; a
+tick on a live service re-posts a cancelled notification; the manifest pins
+USE_EXACT_ALARM + SCHEDULE_EXACT_ALARM so recovery needs no user grant; the
+charging pause keeps re-arming its bounded re-check),
 threshold detection (battery dropped below the highest
 threshold flips the notification to the active tier's name), the overlay
 banner (SYSTEM_ALERT_WINDOW), multi-threshold selection (warning vs critical
@@ -193,20 +196,33 @@ docs/                          # architecture, behavior, testing, screenshots
   flips monitoring → the active tier's name as the level crosses thresholds.
   It doubles as the alert surface when the overlay permission isn't granted
   (toasts are unreliable from the background on Android 10+ and entirely on 12+).
-- Monitoring self-heals. A foreground service can be killed and a sticky
-  restart is not dependable (Android 12+ can refuse the foreground promotion
-  after a restart). `MonitorWatchdog` arms an `AlarmManager` exact alarm
-  (`SCHEDULE_EXACT_ALARM`) about every 15 minutes while monitoring is enabled;
-  `WatchdogReceiver` restarts the service if it has died. Holding a pending
-  exact alarm is a background-foreground-service-start exemption, so the
-  restart is allowed. `onDestroy` re-arms the watchdog; an explicit Stop cancels
-  it. A persisted `monitoringEnabled` flag records the user's intent, so boot
-  and the watchdog never resurrect a monitor the user stopped.
+- Monitoring self-heals; only a manual Stop tears it down. A foreground service
+  can be killed and a sticky restart is not dependable (Android 12+ can refuse
+  the foreground promotion after a restart). `MonitorWatchdog` arms an
+  `AlarmManager` exact alarm about every 15 minutes while monitoring is enabled;
+  `WatchdogReceiver` then runs one tick: dead service → restart; live service →
+  send `ACTION_REFRESH`, which re-posts the notification from the sticky battery
+  (bounded staleness) and repairs a lost cadence. `USE_EXACT_ALARM` is declared
+  so the exact-alarm right is auto-granted on Android 13+ (on 14+
+  `SCHEDULE_EXACT_ALARM` alone is *not* — without the exact grant the restart is
+  not exempt from the background-FGS-start restriction and recovery fails
+  forever). Holding a pending exact alarm is that exemption. `onDestroy` re-arms
+  the watchdog; an explicit Stop cancels it. A persisted `monitoringEnabled`
+  flag records the user's intent, so boot and the watchdog never resurrect a
+  monitor the user stopped. A refused `startForeground` stops the service
+  cleanly (the platform enforces a promotion timeout) and the alarm-exempt
+  watchdog revives it within one tick.
 - While ACTIVE, a lost dismissal cannot dead-end the cycle (the pending poll is
-  tracked separately and re-armed), and one inexact `setAndAllowWhileIdle`
-  backstop alarm per cycle keeps alerts advancing with the CPU asleep in deep
-  doze. `ACTION_POWER_CONNECTED`/`DISCONNECTED` resume/pause on plug changes and
-  `ACTION_SCREEN_ON` polls immediately when the user looks at the device.
+  tracked separately and re-armed; a duration+interval safety net is armed
+  *before* the banner shows and the dismissal callback replaces it), and one
+  inexact `setAndAllowWhileIdle` backstop alarm per cycle keeps alerts advancing
+  with the CPU asleep in deep doze. `ACTION_POWER_CONNECTED`/`DISCONNECTED`
+  resume/pause on plug changes and `ACTION_SCREEN_ON` polls immediately when the
+  user looks at the device.
+- The charging pause (warn-only) and the unknown-level state keep a bounded
+  self-armed re-check running (`suppressedRecheckMs` /
+  `unknownLevelRecheckMs`, test-shrinkable), so recovery never depends solely
+  on broadcasts arriving.
 - An unknown battery level (outside 0–100, e.g. a missing sticky broadcast) is
   never treated as "below every threshold" and selects no tier
   (`activeThresholdFor`).
