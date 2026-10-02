@@ -10,6 +10,9 @@ AVD         := test
 SYS_IMG     := system-images;android-35;google_apis_playstore;x86_64
 DEVICE      := pixel_6
 
+# Default soak runtime: 24 h (make soak MINUTES=30 for a short run).
+MINUTES     ?= 1440
+
 # Passed to the scripts, which also carry these as defaults.
 AVD_ENV     := AVD="$(AVD)" SYS_IMG="$(SYS_IMG)" DEVICE="$(DEVICE)"
 
@@ -17,7 +20,7 @@ AVD_ENV     := AVD="$(AVD)" SYS_IMG="$(SYS_IMG)" DEVICE="$(DEVICE)"
 # gradle's exit status. Shared by `test` and `test-boot` so they stay in sync.
 RUN_TESTS   := gradle connectedDebugAndroidTest; status=$$?; bash scripts/test-report.sh; exit $$status
 
-.PHONY: help shell build release install run clean lint unit avd-clean emulator-clean clean-all uninstall devices avd emulator test test-boot screenshots
+.PHONY: help shell build release install run clean lint unit avd-clean emulator-clean clean-all uninstall devices avd emulator test test-boot soak screenshots
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -72,6 +75,9 @@ test: ## Run instrumented tests (requires a running emulator)
 
 test-boot: ## Reboot the emulator (boot it if needed) then run instrumented tests
 	nix-shell --run 'REBOOT=1 $(AVD_ENV) bash scripts/emulator-up.sh || exit 1; $(RUN_TESTS)'
+
+soak: ## Long-running randomized soak (MINUTES=1440) -> /tmp/battwarn-soak.log
+	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; PKG="$(PKG)" APK="$(APK)" MINUTES="$(MINUTES)" bash scripts/soak-test.sh'
 
 screenshots: ## Capture/refresh docs/screenshots from a running emulator
 	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; bash scripts/screenshots.sh'

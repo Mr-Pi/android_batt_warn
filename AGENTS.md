@@ -55,6 +55,7 @@ make avd          # create the API 35 AVD "test" if it does not exist
 make emulator     # boot headless API 35 emulator (AVD "test") if not running
 make test         # gradle connectedDebugAndroidTest + per-test PASS/FAIL summary
 make test-boot    # reboot emulator (boot it if needed) then run instrumented tests
+make soak         # long-running randomized battery soak -> /tmp/battwarn-soak.log
 make screenshots  # capture/refresh docs/screenshots from a running emulator
 ```
 
@@ -73,6 +74,17 @@ emulator if needed and waits (bounded) for boot; the emulator log is
 `/tmp/battwarn-emulator.log` and its tail is shown on any boot failure.
 `make test-boot` reboots a reused emulator (`REBOOT=1`) so battery/SystemUI
 state is clean, while `make test` runs against the emulator as-is.
+`make soak` runs `scripts/soak-test.sh`: a long (default 24 h, override with
+`make soak MINUTES=30`) host-side adb soak — fresh `pm clear` baseline, Start
+pressed through the real UI, then a randomized battery profile (discharge
+−1% every random 1–5 min; charge to a random 40–100% target when the level
+hits a random 1–50% point). Every `CHECK_SEC` (60) it asserts the FGS is
+alive (watchdog grace before FAIL), the watchdog alarm is still pending, the
+notification tier title matches the simulated level, and no crash/ANR lines
+appeared; a FAIL dumps context (battery/services/logcat) and the run
+continues. All output — checks plus a live `BattWarn`/crash logcat stream —
+goes to `/tmp/battwarn-soak.log` (`LOG=` to override); Ctrl-C and the timeout
+reset the battery simulation and print a summary (exit non-zero on failures).
 
 Direct Gradle options (the `make` targets above wrap these; prefer `make`):
 
@@ -158,7 +170,7 @@ shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator
 Makefile                       # command wrappers
 scripts/                       # test-report.sh, screenshots.sh, ensure-avd.sh,
                                # emulator-up.sh, wait-for-boot.sh, remove-avd.sh,
-                               # clean-emulator.sh
+                               # clean-emulator.sh, soak-test.sh
 README.md                      # project overview and quick start
 docs/                          # architecture, behavior, testing, screenshots
 ```

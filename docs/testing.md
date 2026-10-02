@@ -25,6 +25,7 @@ make avd         # create the API 35 AVD "test" if it does not exist
 make emulator    # boot AVD "test" if needed
 make test        # instrumented tests + PASS/FAIL report
 make test-boot   # reboot (boot if needed), wait for Android, and test
+make soak        # long-running randomized battery soak -> /tmp/battwarn-soak.log
 ```
 
 `make test` preserves Gradle's exit status and parses the connected-test XML
@@ -45,6 +46,22 @@ removes any leftover AVD image/data directory; `make uninstall` uninstalls both
 `/tmp/battwarn-emulator.log` is printed. `make test-boot` reboots a reused
 emulator first (`REBOOT=1`) so battery/SystemUI state is clean; `make test`
 runs against the emulator as-is.
+
+`make soak` (`scripts/soak-test.sh`) is a separate long-running stability test
+outside the Gradle suite: default 24 h (`MINUTES=` to configure). The script
+needs a running device but never boots one itself — `make soak` starts the
+emulator first.
+A fresh `pm clear` baseline gives deterministic 20%/9% thresholds; monitoring
+is started through the real UI (uiautomator bounds + `input tap`); then a
+randomized profile runs (discharge −1% at random 1–5 min intervals, charge to
+a random 40–100% target at a random 1–50% point). Every `CHECK_SEC` (60) the
+harness asserts: FGS alive (with watchdog grace before a FAIL), pending
+watchdog alarm, notification tier title matching the simulated level, and no
+crash/ANR markers. All output — checks, events, and a live `BattWarn` logcat
+stream — goes to one text file, by default `/tmp/battwarn-soak.log` (`LOG=`),
+kept outside the repo for future debugging; FAIL additionally dumps battery,
+service, and logcat context and the run continues. Ctrl-C resets the battery
+simulation and prints a summary; the exit status is non-zero on any FAIL.
 
 ## Test coverage
 
