@@ -48,7 +48,7 @@ make lint         # gradle lintDebug (Android Lint)
 make unit         # gradle testDebugUnitTest (JVM unit tests, no emulator)
 make clean        # gradle clean
 make avd-clean    # stop the emulator and delete the AVD "test"
-make emulator-clean # uninstall app + test APK, stop emulator, delete AVD data
+make emulator-clean # uninstall app + test APK, stop emulator, delete AVD + data
 make clean-all    # gradle clean + emulator-clean
 make devices      # adb devices
 make avd          # create the API 35 AVD "test" if it does not exist
@@ -56,7 +56,7 @@ make emulator     # boot headless API 35 emulator (AVD "test") if not running
 make test         # gradle connectedDebugAndroidTest + per-test PASS/FAIL summary
 make test-boot    # reboot emulator (boot it if needed) then run instrumented tests
 make soak         # long-running randomized battery soak -> /tmp/battwarn-soak.log
-make screenshots  # capture/refresh docs/screenshots from a running emulator
+make screenshots  # capture/refresh docs/screenshots (boots + reboots the emulator)
 ```
 
 The AVD is not committed (it lives in `$ANDROID_AVD_HOME` or
@@ -67,7 +67,8 @@ The AVD is not committed (it lives in `$ANDROID_AVD_HOME` or
 and deletes it again (`scripts/remove-avd.sh`), and `make clean-all` combines
 `clean` with `emulator-clean`. `make emulator-clean` (`scripts/clean-emulator.sh`)
 goes further: it uninstalls the app and the instrumented test APK from a live
-emulator first, then sweeps any leftover AVD image/data directory.
+emulator first, then stops and deletes the AVD (`scripts/remove-avd.sh`) and
+sweeps any leftover AVD image/data directory.
 `make uninstall` removes both `com.example.battwarn` and `com.example.battwarn.test`.
 `scripts/emulator-up.sh` starts the
 emulator if needed and waits (bounded) for boot; the emulator log is
@@ -157,6 +158,8 @@ app/src/androidTest/kotlin/com/example/battwarn/
   MainActivityTest.kt          # main activity UI + add/load threshold rows + remove sound
   ImportExportTest.kt          # settings JSON dialog: show/copy/import/error
   BatteryDropTest.kt           # threshold detection end-to-end
+  AlertIntervalTest.kt         # dismissal-based duration + quiet-pause cycle
+  ChargingTest.kt              # charging pause/resume + warn-only-on-battery flag
   ThresholdSelectionTest.kt    # multi-threshold warning/critical selection
   ThresholdConfigTest.kt       # threshold list baseline, JSON round-trip, sorting, selection
   OverlayAlertTest.kt          # overlay permission + banner render/hide/dismiss callback
@@ -189,8 +192,8 @@ docs/                          # architecture, behavior, testing, screenshots
   `activeThreshold(level)`: the threshold with the smallest level that the
   level is strictly below (the most severe applicable tier). Only that tier's
   settings drive the alert.
-- Each tier carries its own `interval_sec`, `duration_sec`, `sound_uri`,
-  `lock_screen`, `override_silent_dnd`, `allow_snooze`, and `bg_color`/`fg_color`:
+- Each tier carries its own `intervalSec`, `durationSec`, `soundUri`,
+  `lockScreen`, `overrideSilentDnd`, `allowSnooze`, and `bgColor`/`fgColor`:
   - The banner shows for `duration_sec` in the tier's colors; the **next
     banner shows `interval_sec` after the previous banner closed** (auto-
     dismiss or tap) — the interval is a quiet pause between alerts. Without
@@ -199,11 +202,11 @@ docs/                          # architecture, behavior, testing, screenshots
   - `sound_uri` (empty = silent) plays once per cycle; `override_silent_dnd`
     routes it to the alarm channel so it plays in silent/vibrate and typical
     DND.
-  - With the active tier's `warn_only_on_battery` flag (default on), that
+  - With the active tier's `warnOnlyOnBattery` flag (default on), that
     tier's warnings pause while the device is plugged in (AC/USB/wireless) and
     resume on unplug — the notification keeps showing the level with the
     monitoring title meanwhile.
-  - With the tier's `allow_snooze` flag (default off), the active alert's
+  - With the tier's `allowSnooze` flag (default off), the active alert's
     notification carries a "Snooze" button: tapping it pauses that tier's
     banners and sound (polling keeps running at the tier's interval) until the
     active tier changes — crossing into the next (more severe) tier, rising
@@ -217,7 +220,7 @@ docs/                          # architecture, behavior, testing, screenshots
   when the "Display over other apps" permission (SYSTEM_ALERT_WINDOW) is
   granted — visible even in the background. Without it, the notification is
   the fallback.
-- With the tier's `lock_screen` flag (default on) and the overlay permission
+- With the tier's `lockScreen` flag (default on) and the overlay permission
   granted, a warning that fires while the device is locked **and the display
   is already on** is drawn full-screen over the lock screen by
   `LockScreenAlertActivity` (an activity with `showWhenLocked`); the overlay

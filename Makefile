@@ -53,7 +53,7 @@ unit: ## JVM unit tests (no emulator needed)
 avd-clean: ## Stop the emulator and delete the AVD "$(AVD)"
 	nix-shell --run '$(AVD_ENV) bash scripts/remove-avd.sh'
 
-emulator-clean: ## Uninstall app + test APK, stop emulator, delete AVD image data
+emulator-clean: ## Uninstall app + test APK, stop emulator, delete AVD + data
 	nix-shell --run '$(AVD_ENV) PKG="$(PKG)" bash scripts/clean-emulator.sh'
 
 clean-all: clean emulator-clean ## Clean build outputs and full emulator/AVD teardown
@@ -79,6 +79,6 @@ test-boot: ## Reboot the emulator (boot it if needed) then run instrumented test
 soak: ## Long-running randomized soak (MINUTES=1440) -> /tmp/battwarn-soak.log
 	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; PKG="$(PKG)" APK="$(APK)" MINUTES="$(MINUTES)" bash scripts/soak-test.sh'
 
-screenshots: ## Capture/refresh docs/screenshots from a running emulator
+screenshots: ## Capture/refresh docs/screenshots (boots + reboots the emulator)
 	nix-shell --run '$(AVD_ENV) bash scripts/emulator-up.sh || exit 1; bash scripts/screenshots.sh'
 

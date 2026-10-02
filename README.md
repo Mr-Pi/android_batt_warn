@@ -59,7 +59,7 @@ For emulator development:
 make test-boot   # reboot the API 35 AVD and run instrumented tests
 make test        # run tests against an already-running emulator
 make avd-clean   # stop the emulator and delete the AVD
-make emulator-clean # uninstall app + test APK, stop emulator, delete AVD data
+make emulator-clean # uninstall app + test APK, stop emulator, delete AVD + data
 make soak        # long-running randomized soak (default 24 h) -> /tmp/battwarn-soak.log
 ```
 
@@ -71,8 +71,8 @@ printing a notice when they do, then boot and wait (bounded) for Android;
 `make avd-clean` stops the emulator and removes the AVD again (`make clean-all`
 pairs it with Gradle `clean` through `emulator-clean`).
 `make emulator-clean` additionally uninstalls the app and
-the test APK from a live emulator first and sweeps any leftover AVD image/data
-directory; `make uninstall` removes both the app and the test APK.
+the test APK from a live emulator first, then stops and deletes the AVD and
+sweeps any leftover image/data directory; `make uninstall` removes both the app and the test APK.
 `make soak` runs a separate long (default 24 h, `MINUTES=`) randomized
 battery soak whose checks and live logcat all go to `/tmp/battwarn-soak.log`
 (`LOG=`) for later debugging.

@@ -18,7 +18,7 @@ make install     # build and install
 make run         # install and launch
 make clean       # Gradle clean
 make avd-clean   # stop the emulator and delete the AVD "test"
-make emulator-clean # uninstall app + test APK, stop emulator, delete AVD data
+make emulator-clean # uninstall app + test APK, stop emulator, delete AVD + data
 make clean-all   # Gradle clean + emulator-clean
 make devices     # adb devices
 make avd         # create the API 35 AVD "test" if it does not exist
@@ -38,8 +38,9 @@ say so when they do. `make avd-clean` stops the emulator and deletes it again
 (`scripts/remove-avd.sh`; `make clean-all` runs it together with Gradle `clean`
 through `emulator-clean`).
 `make emulator-clean` (`scripts/clean-emulator.sh`) additionally uninstalls the
-app and the instrumented test APK from a live emulator before stopping it, and
-removes any leftover AVD image/data directory; `make uninstall` uninstalls both
+app and the instrumented test APK from a live emulator, then stops and deletes
+the AVD (`scripts/remove-avd.sh`) and removes any leftover AVD image/data
+directory; `make uninstall` uninstalls both
 `com.example.battwarn` and `com.example.battwarn.test`.
 `scripts/emulator-up.sh` starts the emulator if needed and
 `scripts/wait-for-boot.sh` waits (bounded) for boot; on failure the tail of
@@ -112,7 +113,7 @@ The emulator suite currently contains 73 tests across these classes:
 
 The pure model logic (active-tier selection, JSON codec, color parsing) and the
 watchdog restart decision are also covered by JVM unit tests in `app/src/test`
-(`AlertThresholdTest`, `WatchdogDecisionTest`, 12 tests in total) —
+(`AlertThresholdTest`, `WatchdogDecisionTest`, 13 tests in total) —
 they run with `gradle testDebugUnitTest` and need no emulator. The unit tests use
 the `org.json` artifact because the platform's JSON classes are not available on
 the plain JVM.

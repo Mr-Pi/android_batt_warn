@@ -22,7 +22,7 @@ stateDiagram-v2
     [*] --> IDLE
     IDLE --> ACTIVE: battery changed below highest threshold
     ACTIVE --> IDLE: level reaches highest threshold or ACTION_BATTERY_OKAY
-    ACTIVE --> IDLE: charging + active tier's Warn only on battery
+    ACTIVE --> ACTIVE: charging + active tier's Warn only on battery (suppressed pause, keeps re-checking)
 ```
 
 While ACTIVE, the tier is selected on every cycle:
@@ -82,7 +82,7 @@ user's intent; boot and the watchdog honor it. See
 
 1. A battery event refreshes the foreground notification immediately.
 2. If the level is below the highest threshold, the service enters the active
-   tier ([activeThresholdFor]; an unknown level selects no tier).
+   tier (`activeThresholdFor`; an unknown level selects no tier).
 3. The banner is shown for the tier duration in the tier's colors.
 4. When the banner closes, the service waits the tier interval.
 5. The next cycle reads settings and battery level again.
