@@ -21,10 +21,13 @@ Everything is provided by nix:
 nix-shell          # enter the dev environment (regenerates local.properties)
 ```
 
-**Build and test through the `make` targets** (`make build`, `make test`,
-`make test-boot`, …): they wrap `nix-shell --run`, so they work from any shell
-and keep the AVD/battery setup consistent. Call `gradle` directly only for a
-narrow, targeted run inside an existing `nix-shell`.
+**Build and test through the `make` targets** (`make build`, `make lint`,
+`make unit`, `make test`, `make test-boot`, …): they wrap `nix-shell --run`,
+so they work from any shell and keep the AVD/battery setup consistent. Prefer
+them over calling `gradle` or `nix-shell` directly — if a needed command has no
+target yet, add one to the `Makefile` rather than reaching for raw `gradle`;
+call `gradle` directly only for a narrow, targeted run inside an existing
+`nix-shell`.
 
 The shell provides Gradle 8.14.4, JDK 17, the Android SDK (platform 35,
 build-tools, platform-tools, NDK r27, CMake, the API 35 AVD system image,
@@ -41,6 +44,8 @@ make build        # gradle assembleDebug              -> app/build/outputs/apk/d
 make release      # gradle assembleRelease (unsigned)
 make install      # build + adb install to connected device
 make run          # install + start MainActivity
+make lint         # gradle lintDebug (Android Lint)
+make unit         # gradle testDebugUnitTest (JVM unit tests, no emulator)
 make clean        # gradle clean
 make avd-clean    # stop the emulator and delete the AVD "test"
 make clean-all    # gradle clean + avd-clean
@@ -64,7 +69,7 @@ emulator if needed and waits (bounded) for boot; the emulator log is
 `make test-boot` reboots a reused emulator (`REBOOT=1`) so battery/SystemUI
 state is clean, while `make test` runs against the emulator as-is.
 
-Direct Gradle options:
+Direct Gradle options (the `make` targets above wrap these; prefer `make`):
 
 ```
 gradle assembleDebug            # build debug APK
@@ -286,5 +291,5 @@ docs/                          # architecture, behavior, testing, screenshots
 Use the `make` targets for anything that needs the toolchain or an emulator.
 
 1. `make build` — the debug APK must build.
-2. `gradle lintDebug` — no new fatal lint issues (run inside `nix-shell`).
+2. `make lint` — no new fatal lint issues.
 3. If the app behavior changed, run `make test` (emulator + instrumented tests).
