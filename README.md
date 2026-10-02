@@ -16,8 +16,9 @@ alerts before the battery gets too low.
 - Event-driven battery monitoring with no idle polling.
 - User-configurable list of thresholds; each threshold has its own level, name,
   sound, quiet interval, banner duration, lock-screen display, silent/DND
-  override, background/text colors, and a per-threshold **Warn only on
-  battery** mode that pauses alerts while charging.
+  override, background/text colors, a per-threshold **Warn only on
+  battery** mode that pauses alerts while charging, and a per-threshold
+  **Allow snoozing** option that adds a Snooze button to the alert.
 - Every threshold can play a user-picked notification sound.
 - Floating bottom banner when “Display over other apps” is enabled.
 - Full-screen lock-screen warning (default on) while the display is already on.
@@ -104,8 +105,9 @@ severe applicable tier. With thresholds at 20% and 9%, for example: at 15% the
 20% tier applies, at 8% the 9% tier applies, and at or above 20% the service
 stays idle. A threshold can carry an optional name (shown before the percentage
 and as the notification title), a picked sound, its own quiet interval and
-banner duration, a lock-screen toggle, a silent/DND override, and its own
-background/text colors for the banner and the lock-screen alert.
+banner duration, a lock-screen toggle, a silent/DND override, a **Snooze**
+opt-in, and its own background/text colors for the banner and the lock-screen
+alert.
 
 The interval is a quiet pause measured **after** the previous banner closes,
 whether it auto-dismissed or was tapped. If the overlay permission is absent,
@@ -124,6 +126,12 @@ The **active** threshold's **Warn only on battery** flag decides whether
 warnings pause while charging, so each tier can warn (or stay silent) while
 plugged in. The foreground notification continues to show the current level
 while charging.
+
+With **Allow snoozing** enabled for a threshold (default off), the active
+alert's notification gets a **Snooze** button. Tapping it silences that
+tier's banners and sound until the level crosses into the next threshold
+(or back out of it), where alerts start fresh; the button then reads
+**Show alerts** to resume without waiting.
 
 See [docs/behavior.md](docs/behavior.md) and [docs/architecture.md](docs/architecture.md)
 for details.
@@ -156,7 +164,7 @@ battery-restricted.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 67 (plus 12 JVM unit tests)
+- Instrumented tests: 73 (plus 13 JVM unit tests)
 
 ## Documentation
 

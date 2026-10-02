@@ -14,6 +14,8 @@ alerts below its level and carries its own:
   keyguard.
 - **Play in silent / DND** — whether this tier's sound overrides the silent
   ringer and typical Do Not Disturb.
+- **Allow snoozing** — whether this tier's active alert offers a Snooze
+  button on the notification (see Snooze below).
 - **Background / text colors** — the banner and lock-screen alert surface.
 
 ## Tier selection
@@ -55,6 +57,24 @@ warning while charging — for example, a 60% tier with the flag off warns from
 50% while charging. During the pause the service keeps a slow self-armed
 re-check running (15 minutes), so even a lost unplug broadcast resumes the
 alerts instead of ending them.
+
+## Snooze
+
+Each threshold carries its own **Allow snoozing** flag (default off). While
+such a tier is the active alert, its notification shows a **Snooze** button.
+Tapping it pauses that tier's banners and sound: the notification title
+becomes "<tier name> (snoozed)", the button flips to **Show alerts**, and the
+monitor keeps polling at the tier's interval so crossings are still noticed —
+only the alert surfaces go quiet.
+
+The snooze belongs to the tier that was active when it was tapped and is
+released automatically when the active tier changes: dropping below the next
+(more severe) threshold, rising back out of the snoozed tier, or an unknown
+battery reading all start alerts fresh — a tier that becomes active later is
+never pre-muted. Tapping **Show alerts** lifts the snooze immediately,
+resuming banners on the next cycle. The button is hidden while the charging
+pause holds (nothing is popping up to silence), and the snooze is in-memory
+only: a service restart un-snoozes.
 
 ## Alert sound
 

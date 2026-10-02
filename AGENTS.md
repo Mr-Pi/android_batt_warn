@@ -124,6 +124,9 @@ on, blocked without), the lock-screen alert (default on; gate requires locked +
 screen already on + overlay permission, activity renders the message/colors and
 auto-dismisses), the charging suppression (the active tier's
 warn-only-on-battery flag pauses or continues alerts while plugged in), the
+per-threshold snooze (button hidden without the flag; snoozing freezes banners
+and flips the title/action, "Show alerts" resumes, crossing into the next tier
+releases it, the charging pause hides the button, UI round-trip), the
 threshold-list settings (fresh 20%/9% baseline, JSON
 round-trip, add/load rows), the main activity UI, the settings import/export
 dialog (show stored JSON, copy, valid import loads rows, invalid paste errors),
@@ -158,6 +161,7 @@ app/src/androidTest/kotlin/com/example/battwarn/
   ThresholdConfigTest.kt       # threshold list baseline, JSON round-trip, sorting, selection
   OverlayAlertTest.kt          # overlay permission + banner render/hide/dismiss callback
   OverrideSilentDndTest.kt     # per-threshold silent/DND override + UI round-trip
+  SnoozeTest.kt                # notification snooze button: freeze/resume, tier-crossing release, UI round-trip
   LockScreenAlertTest.kt       # lock-screen gate, activity render/colors/auto-dismiss, UI round-trip
   AboutActivityTest.kt         # in-app legal screen renders version, privacy, MIT, notices, Apache-2.0
 app/src/test/kotlin/com/example/battwarn/
@@ -186,7 +190,7 @@ docs/                          # architecture, behavior, testing, screenshots
   level is strictly below (the most severe applicable tier). Only that tier's
   settings drive the alert.
 - Each tier carries its own `interval_sec`, `duration_sec`, `sound_uri`,
-  `lock_screen`, `override_silent_dnd`, and `bg_color`/`fg_color`:
+  `lock_screen`, `override_silent_dnd`, `allow_snooze`, and `bg_color`/`fg_color`:
   - The banner shows for `duration_sec` in the tier's colors; the **next
     banner shows `interval_sec` after the previous banner closed** (auto-
     dismiss or tap) — the interval is a quiet pause between alerts. Without
@@ -199,6 +203,14 @@ docs/                          # architecture, behavior, testing, screenshots
     tier's warnings pause while the device is plugged in (AC/USB/wireless) and
     resume on unplug — the notification keeps showing the level with the
     monitoring title meanwhile.
+  - With the tier's `allow_snooze` flag (default off), the active alert's
+    notification carries a "Snooze" button: tapping it pauses that tier's
+    banners and sound (polling keeps running at the tier's interval) until the
+    active tier changes — crossing into the next (more severe) tier, rising
+    back out, or an unknown reading — or the user taps the button, which then
+    reads "Show alerts". The title becomes "<tier> (snoozed)". The snooze is
+    in-memory only (a service restart un-snoozes) and the button is hidden
+    while the charging pause holds (nothing pops up to silence).
   - Exits when the level rises back above the highest threshold or on
     `ACTION_BATTERY_OKAY`.
 - The alert is a floating banner (OverlayAlert) tinted with the tier's colors
@@ -269,17 +281,18 @@ docs/                          # architecture, behavior, testing, screenshots
 - Settings live in `AppSettings` (SharedPreferences `battwarn_settings`):
   the `thresholds` JSON list (each entry: `level`, `name`, `intervalSec`,
   `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`,
-  `fgColor`, `warnOnlyOnBattery`). The fresh baseline is a 20% "Battery
-  low" tier and a 9% "Battery critical" tier, both silent, lock-screen on,
-  warn-only-on-battery on, red background/white text. Legacy single keys are
-  ignored (no migration).
+  `fgColor`, `warnOnlyOnBattery`, `allowSnooze`). The fresh baseline is a 20%
+  "Battery low" tier and a 9% "Battery critical" tier, both silent, lock-screen
+  on, warn-only-on-battery on, snoozing off, red background/white text. Legacy
+  single keys are ignored (no migration).
 - Each threshold row (name field first, then level/interval/duration):
   level (0-100, unique), optional name (shown before the percentage and as
   the notification title; blank falls back to "Battery low"), interval/
   duration ≥ 1s with no upper cap, a picked tone (empty = silent; per-row
   Remove sound button), a "Show on lock screen" checkbox, a "Warn only on
-  battery" checkbox, a "Play in silent / DND" checkbox (all three wrap onto
-  as many lines as needed), and a color popup with preset background/text
+  battery" checkbox, a "Play in silent / DND" checkbox, an "Allow snoozing"
+  checkbox (all four wrap onto as many lines as needed), and a color popup with
+  preset background/text
   swatches shown as two side-by-side preview circles next to the sample
   banner. Save validates, stores sorted by level descending, reloads the
   rows in that sorted order, and restarts the running service so new values

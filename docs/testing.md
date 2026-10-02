@@ -65,7 +65,7 @@ simulation and prints a summary; the exit status is non-zero on any FAIL.
 
 ## Test coverage
 
-The emulator suite currently contains 67 tests across these classes:
+The emulator suite currently contains 73 tests across these classes:
 
 - `AboutActivityTest` — in-app legal screen renders the version, privacy
   statement, MIT license, third-party notices, and the full Apache-2.0 text.
@@ -101,6 +101,10 @@ The emulator suite currently contains 67 tests across these classes:
 - `ServiceSmokeTest` — foreground lifecycle and notification; the notification's
   content intent opens MainActivity (sent in the background with the
   SYSTEM_ALERT_WINDOW appop granted, the exemption a real tap also relies on).
+- `SnoozeTest` — per-threshold snooze: button present only with the flag and
+  not while charging-suppressed; tapping "Snooze" freezes banners and flips
+  the title/action; "Show alerts" resumes; crossing into the next tier
+  releases the snooze; the checkbox round-trips through save and reload.
 - `ThresholdConfigTest` — fresh baseline, JSON persistence round-trip, sorting,
   selection from the stored list.
 - `ThresholdSelectionTest` — two-threshold end-to-end title flips and the pure

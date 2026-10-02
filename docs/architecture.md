@@ -114,12 +114,13 @@ Settings are stored in `battwarn_settings`:
 
 | Key | Default | Meaning |
 | --- | ---: | --- |
-| `thresholds` | 20%/9% baseline | JSON list of user thresholds; each has `level`, `name`, `intervalSec`, `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`, `fgColor`, `warnOnlyOnBattery` |
+| `thresholds` | 20%/9% baseline | JSON list of user thresholds; each has `level`, `name`, `intervalSec`, `durationSec`, `soundUri`, `lockScreen`, `overrideSilentDnd`, `bgColor`, `fgColor`, `warnOnlyOnBattery`, `allowSnooze` |
 | `monitoringEnabled` | `false` | Persisted Start/Stop intent; honored by the boot receiver and the liveness watchdog |
 
 The fresh-install baseline is a 20% "Battery low" tier and a 9% "Battery
 critical" tier, both silent, with lock-screen display on, warn-only-on-battery
-on, and the default red background/white text. Legacy single-key settings are
+on, snoozing off, and the default red background/white text. Legacy single-key
+settings are
 ignored (no migration); when the stored list is empty the baseline is returned.
 
 Intervals and durations accept values of one second or greater with no upper
