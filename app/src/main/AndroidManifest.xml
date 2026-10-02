@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Required to fire ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS from the
+         Start flow (the battery-optimization exemption the docs promise). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Auto-granted on API 33+ (SCHEDULE_EXACT_ALARM is not on 34+): the
          watchdog's exact alarm is what lets it restart the service from the
