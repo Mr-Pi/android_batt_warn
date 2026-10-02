@@ -316,6 +316,7 @@ class MainActivity : AppCompatActivity() {
                     bgColor = row.bgColor,
                     fgColor = row.fgColor,
                     warnOnlyOnBattery = row.binding.warnOnBatteryCheck.isChecked,
+                    allowSnooze = row.binding.allowSnoozeCheck.isChecked,
                 )
             }
         }
@@ -601,6 +602,7 @@ class MainActivity : AppCompatActivity() {
             binding.lockScreenCheck.isChecked = threshold.lockScreen
             binding.dndCheck.isChecked = threshold.overrideSilentDnd
             binding.warnOnBatteryCheck.isChecked = threshold.warnOnlyOnBattery
+            binding.allowSnoozeCheck.isChecked = threshold.allowSnooze
             bgColor = threshold.bgColor
             fgColor = threshold.fgColor
             updateSoundLabel()

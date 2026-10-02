@@ -44,6 +44,7 @@ class ThresholdConfigTest {
         assertTrue("both defaults show on the lock screen", defaults.all { it.lockScreen })
         assertTrue("both defaults honor silent/DND", defaults.all { !it.overrideSilentDnd })
         assertTrue("both defaults warn only on battery", defaults.all { it.warnOnlyOnBattery })
+        assertTrue("both defaults disallow snoozing", defaults.all { !it.allowSnooze })
         assertEquals(DEFAULT_BG_COLOR, defaults[0].bgColor)
         assertEquals(DEFAULT_FG_COLOR, defaults[0].fgColor)
     }

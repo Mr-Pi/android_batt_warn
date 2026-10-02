@@ -166,11 +166,17 @@
                 android:layout_height="wrap_content"
                 android:text="@string/override_silent_dnd" />
 
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/allow_snooze_check"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/allow_snooze" />
+
             <androidx.constraintlayout.helper.widget.Flow
                 android:id="@+id/options_flow"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                app:constraint_referenced_ids="lock_screen_check,warn_on_battery_check,dnd_check"
+                app:constraint_referenced_ids="lock_screen_check,warn_on_battery_check,dnd_check,allow_snooze_check"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"

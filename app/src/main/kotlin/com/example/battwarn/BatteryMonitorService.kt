@@ -52,8 +52,12 @@ import androidx.core.content.ContextCompat
  * woken.
  * The FGS notification is refreshed on every battery change (in both IDLE and
  * ACTIVE) so it always reflects the current level and the active tier's name.
- * Polling stops when the battery rises back above the highest threshold or on
- * ACTION_BATTERY_OKAY.
+ * A tier with [AlertThreshold.allowSnooze] (default off) offers a "Snooze"
+ * button on that notification; tapping it pauses the tier's banners/sound (the
+ * polling cadence keeps running) until the active tier changes or the user
+ * taps "Show alerts". The snooze is in-memory only: a service restart
+ * un-snoozes. Polling stops when the battery rises back above the highest
+ * threshold or on ACTION_BATTERY_OKAY.
  *
  * The service assumes it must never stay down while the user wants monitoring:
  * [MonitorWatchdog]'s tick restarts it when dead, or sends [ACTION_REFRESH]
@@ -81,6 +85,13 @@ class BatteryMonitorService : Service() {
     private var pollScheduled = false
     private var overlayAlert: OverlayAlert? = null
     private var alertRingtone: Ringtone? = null
+
+    /**
+     * Level of the tier the user snoozed, or null. Cleared when the active tier
+     * changes ([pruneSnooze]) or the user taps "Show alerts". In-memory only by
+     * design: a restart un-snoozes.
+     */
+    private var snoozedLevel: Int? = null
 
     /** Receivers are registered once per instance; onStartCommand can run again. */
     private var receiversRegistered = false
@@ -138,6 +149,8 @@ class BatteryMonitorService : Service() {
                 return
             }
             val threshold = activeThreshold(level, AppSettings.thresholds(this@BatteryMonitorService))
+            pruneSnooze(threshold)
+            val snoozed = threshold != null && snoozedLevel == threshold.level
             val suppressed = isChargingNow() && threshold?.warnOnlyOnBattery == true
             updateNotification(level, threshold, suppressed)
             when {
@@ -148,6 +161,12 @@ class BatteryMonitorService : Service() {
                     polling = false
                     suppressedRechecks++
                     scheduleNextPoll(suppressedRecheckMs)
+                }
+                snoozed -> {
+                    // Snoozed tier: no banner/sound, but the cadence keeps
+                    // running so a crossing into the next tier is noticed.
+                    Log.i(TAG, "tier ${threshold!!.level}% snoozed at $level% — alerts paused")
+                    scheduleNextPoll(threshold.intervalSec * 1000L)
                 }
                 threshold != null -> showLowBatteryAlert(level, threshold)
                 else -> {
@@ -172,6 +191,7 @@ class BatteryMonitorService : Service() {
     private fun tryStartForeground(): Boolean {
         val level = currentBatteryLevel()
         val threshold = activeThresholdFor(level, AppSettings.thresholds(this))
+        pruneSnooze(threshold)
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
         return try {
             startForeground(NOTIFICATION_ID, buildNotification(level, threshold, suppressed))
@@ -187,6 +207,20 @@ class BatteryMonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand action=${intent?.action} startId=$startId")
         createNotificationChannel()
+        // A snooze / "Show alerts" button tap arrives here as a start command
+        // (the notification's PendingIntent targets this service; a button tap
+        // is a user action, so it is never blocked by background restrictions).
+        // Updating the state before the normal flow lets tryStartForeground
+        // below re-post the notification with the new title/button.
+        when (intent?.action) {
+            ACTION_SNOOZE, ACTION_UNSNOOZE -> {
+                val level = currentBatteryLevel()
+                val threshold = activeThresholdFor(level, AppSettings.thresholds(this))
+                pruneSnooze(threshold)
+                snoozedLevel = if (intent.action == ACTION_SNOOZE) threshold?.level else null
+                Log.i(TAG, "snooze ${if (snoozedLevel != null) "armed at tier $snoozedLevel%" else "released"}")
+            }
+        }
         // A refused promotion stops the service and returns without touching
         // the cadence; the watchdog (alarm-exempt) revives it.
         if (!tryStartForeground()) {
@@ -205,6 +239,7 @@ class BatteryMonitorService : Service() {
         val thresholds = AppSettings.thresholds(this)
         val level = currentBatteryLevel()
         val threshold = activeThresholdFor(level, thresholds)
+        pruneSnooze(threshold)
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
         val highest = highestThreshold(thresholds)
         when {
@@ -362,6 +397,7 @@ class BatteryMonitorService : Service() {
     private fun onBatteryChanged(intent: Intent?) {
         val level = levelFrom(intent)
         val threshold = activeThresholdFor(level, AppSettings.thresholds(this))
+        pruneSnooze(threshold)
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
         updateNotification(level, threshold, suppressed)
         when {
@@ -379,6 +415,7 @@ class BatteryMonitorService : Service() {
         Log.i(TAG, "power changed (charging=${isChargingNow()})")
         val level = currentBatteryLevel()
         val threshold = activeThresholdFor(level, AppSettings.thresholds(this))
+        pruneSnooze(threshold)
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
         updateNotification(level, threshold, suppressed)
         when {
@@ -402,6 +439,7 @@ class BatteryMonitorService : Service() {
     private fun onScreenOn() {
         val level = currentBatteryLevel()
         val threshold = activeThresholdFor(level, AppSettings.thresholds(this))
+        pruneSnooze(threshold)
         val suppressed = threshold != null && isChargingNow() && threshold.warnOnlyOnBattery
         updateNotification(level, threshold, suppressed)
         if (threshold != null && !suppressed) {
@@ -413,6 +451,19 @@ class BatteryMonitorService : Service() {
     /** Plugged into AC/USB/wireless right now? */
     private fun isChargingNow(): Boolean =
         stickyBattery()?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+
+    /**
+     * A snooze belongs to the tier that was active when it was tapped. Any
+     * change of the active tier — crossing into the next (more severe) one,
+     * rising back out, or an unknown reading — releases it, so a later drop
+     * alerts fresh and "the next threshold to become active" is never muted.
+     */
+    private fun pruneSnooze(active: AlertThreshold?) {
+        if (snoozedLevel != null && active?.level != snoozedLevel) {
+            Log.i(TAG, "active tier changed — snooze released")
+            snoozedLevel = null
+        }
+    }
 
     private fun currentBatteryLevel(): Int = levelFrom(stickyBattery())
 
@@ -578,8 +629,10 @@ class BatteryMonitorService : Service() {
         threshold: AlertThreshold?,
         suppressed: Boolean = false
     ): Notification {
+        val snoozed = threshold != null && !suppressed && threshold.level == snoozedLevel
         val title = when {
             suppressed && threshold != null -> getString(R.string.notif_title_monitoring)
+            snoozed -> getString(R.string.notif_title_snoozed, threshold!!.displayName(this))
             threshold != null -> threshold.displayName(this)
             else -> getString(R.string.notif_title_monitoring)
         }
@@ -588,7 +641,7 @@ class BatteryMonitorService : Service() {
         } else {
             getString(R.string.notif_text_unknown)
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_notification)
@@ -596,7 +649,19 @@ class BatteryMonitorService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+        // Snooze button: only for a tier that allows it, and only when the
+        // notification actually represents the active alert — while the
+        // charging pause holds there is nothing popping up to silence.
+        if (threshold != null && threshold.allowSnooze && !suppressed) {
+            builder.addAction(
+                if (snoozed) R.drawable.ic_action_unsnooze else R.drawable.ic_action_snooze,
+                getString(
+                    if (snoozed) R.string.notif_action_unsnooze else R.string.notif_action_snooze
+                ),
+                snoozePendingIntent(snoozed)
+            )
+        }
+        return builder.build()
     }
 
     /** Tapping the notification opens the app (the ongoing notification stays). */
@@ -610,6 +675,18 @@ class BatteryMonitorService : Service() {
             this,
             OPEN_APP_REQUEST_CODE,
             intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    /** The button's intent toggles: while snoozed it fires ACTION_UNSNOOZE. */
+    private fun snoozePendingIntent(snoozed: Boolean): PendingIntent {
+        val action = if (snoozed) ACTION_UNSNOOZE else ACTION_SNOOZE
+        val code = if (snoozed) UNSNOOZE_REQUEST_CODE else SNOOZE_REQUEST_CODE
+        return PendingIntent.getService(
+            this,
+            code,
+            Intent(this, BatteryMonitorService::class.java).setAction(action),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
@@ -632,12 +709,20 @@ class BatteryMonitorService : Service() {
         private const val DOZE_BACKSTOP_SLACK_MS = 10_000L
         private const val DOZE_BACKSTOP_REQUEST_CODE = 0x8A8
         private const val OPEN_APP_REQUEST_CODE = 0x0A11
+        private const val SNOOZE_REQUEST_CODE = 0x5C1
+        private const val UNSNOOZE_REQUEST_CODE = 0x5C2
 
         /** Internal broadcast action for the doze backstop alarm. */
         const val ACTION_DOZE_BACKSTOP = "com.example.battwarn.DOZE_BACKSTOP"
 
         /** Watchdog tick while alive: re-post the notification + repair cadence. */
         const val ACTION_REFRESH = "com.example.battwarn.REFRESH"
+
+        /** Notification button: pause the active tier's alerts (see [AlertThreshold.allowSnooze]). */
+        const val ACTION_SNOOZE = "com.example.battwarn.SNOOZE"
+
+        /** Notification button: lift the snooze so alerts resume on the next cycle. */
+        const val ACTION_UNSNOOZE = "com.example.battwarn.UNSNOOZE"
 
         /** Re-check cadence while charging suppression or an unknown level applies. */
         internal var suppressedRecheckMs = 15 * 60_000L

@@ -25,6 +25,7 @@ data class AlertThreshold(
     val bgColor: Int,
     val fgColor: Int,
     val warnOnlyOnBattery: Boolean = true,
+    val allowSnooze: Boolean = false,
 )
 
 const val DEFAULT_INTERVAL_SEC = 25
@@ -99,6 +100,7 @@ private fun AlertThreshold.toJson(): JSONObject = JSONObject().apply {
     put("bgColor", colorToHex(bgColor))
     put("fgColor", colorToHex(fgColor))
     put("warnOnlyOnBattery", warnOnlyOnBattery)
+    put("allowSnooze", allowSnooze)
 }
 
 private fun fromJson(json: JSONObject): AlertThreshold = AlertThreshold(
@@ -112,6 +114,7 @@ private fun fromJson(json: JSONObject): AlertThreshold = AlertThreshold(
     bgColor = parseHexColor(json.optString("bgColor", ""), DEFAULT_BG_COLOR),
     fgColor = parseHexColor(json.optString("fgColor", ""), DEFAULT_FG_COLOR),
     warnOnlyOnBattery = json.optBoolean("warnOnlyOnBattery", true),
+    allowSnooze = json.optBoolean("allowSnooze", false),
 )
 
 /** Renders an opaque ARGB int as `#RRGGBB`. */

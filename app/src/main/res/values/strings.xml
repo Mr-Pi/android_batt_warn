@@ -15,6 +15,9 @@
     <string name="notif_title_monitoring">Battery monitor active</string>
     <string name="notif_text_level">Battery at %1$d%%</string>
     <string name="notif_text_unknown">Battery level unknown</string>
+    <string name="notif_title_snoozed">%1$s (snoozed)</string>
+    <string name="notif_action_snooze">Snooze</string>
+    <string name="notif_action_unsnooze">Show alerts</string>
 
     <!-- Threshold list section -->
     <string name="thresholds_title">Alert thresholds</string>
@@ -35,6 +38,7 @@
     <string name="lock_screen_alert">Show on lock screen</string>
     <string name="override_silent_dnd">Play in silent / DND</string>
     <string name="warn_on_battery">Warn only on battery</string>
+    <string name="allow_snooze">Allow snoozing</string>
     <string name="label_bg_color">Background</string>
     <string name="label_fg_color">Text</string>
     <string name="label_colors">Colors</string>

@@ -118,4 +118,28 @@ class AlertThresholdTest {
         val decoded = decodeThresholds(org.json.JSONArray().put(legacy).toString()).single()
         assertEquals("missing key must decode to the ON default", true, decoded.warnOnlyOnBattery)
     }
+
+    @Test
+    fun allowSnooze_defaultsOffAndSurvivesRoundTrip() {
+        assertTrue("snoozing must default off", !low.allowSnooze)
+
+        val on = low.copy(allowSnooze = true)
+        assertEquals(on, decodeThresholds(encodeThresholds(listOf(on))).single())
+        assertEquals(true, decodeThresholds(encodeThresholds(listOf(on))).single().allowSnooze)
+
+        // Legacy JSON without the key must decode to the OFF default.
+        val legacy = org.json.JSONObject().apply {
+            put("level", 20)
+            put("name", "Battery low")
+            put("intervalSec", 25)
+            put("durationSec", 5)
+            put("soundUri", "")
+            put("lockScreen", true)
+            put("overrideSilentDnd", false)
+            put("bgColor", "#D32F2F")
+            put("fgColor", "#FFFFFF")
+        }
+        val decoded = decodeThresholds(org.json.JSONArray().put(legacy).toString()).single()
+        assertEquals("missing key must decode to the OFF default", false, decoded.allowSnooze)
+    }
 }
