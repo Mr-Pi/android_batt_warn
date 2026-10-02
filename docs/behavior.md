@@ -95,6 +95,9 @@ bottom banner above other apps. It is non-focusable, auto-dismisses, and can be
 tapped to close. Without that special permission, the foreground notification
 remains the reliable alert surface.
 
+Tapping the notification (banner path or fallback) opens the app's main screen;
+the ongoing notification itself stays.
+
 Some apps using `FLAG_SECURE` may block overlays; the notification remains
 available in that case.
 

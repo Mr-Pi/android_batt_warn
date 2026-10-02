@@ -42,7 +42,7 @@ runs against the emulator as-is.
 
 ## Test coverage
 
-The emulator suite currently contains 66 tests across these classes:
+The emulator suite currently contains 67 tests across these classes:
 
 - `AboutActivityTest` — in-app legal screen renders the version, privacy
   statement, MIT license, third-party notices, and the full Apache-2.0 text.
@@ -75,7 +75,9 @@ The emulator suite currently contains 66 tests across these classes:
 - `OverlayAlertTest` — permission, render/hide, dismissal callback behavior.
 - `OverrideSilentDndTest` — per-threshold silent/DND override gate, alarm
   attributes, UI round-trip.
-- `ServiceSmokeTest` — foreground lifecycle and notification.
+- `ServiceSmokeTest` — foreground lifecycle and notification; the notification's
+  content intent opens MainActivity (sent in the background with the
+  SYSTEM_ALERT_WINDOW appop granted, the exemption a real tap also relies on).
 - `ThresholdConfigTest` — fresh baseline, JSON persistence round-trip, sorting,
   selection from the stored list.
 - `ThresholdSelectionTest` — two-threshold end-to-end title flips and the pure

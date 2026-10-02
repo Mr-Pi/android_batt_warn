@@ -592,10 +592,26 @@ class BatteryMonitorService : Service() {
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(openAppPendingIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
+    }
+
+    /** Tapping the notification opens the app (the ongoing notification stays). */
+    private fun openAppPendingIntent(): PendingIntent {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        return PendingIntent.getActivity(
+            this,
+            OPEN_APP_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     private fun updateNotification(
@@ -615,6 +631,7 @@ class BatteryMonitorService : Service() {
         /** Extra slack so the backstop lands after the handler's own wake-up. */
         private const val DOZE_BACKSTOP_SLACK_MS = 10_000L
         private const val DOZE_BACKSTOP_REQUEST_CODE = 0x8A8
+        private const val OPEN_APP_REQUEST_CODE = 0x0A11
 
         /** Internal broadcast action for the doze backstop alarm. */
         const val ACTION_DOZE_BACKSTOP = "com.example.battwarn.DOZE_BACKSTOP"

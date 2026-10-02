@@ -86,7 +86,9 @@ BOOT_COMPLETED / MY_PACKAGE_REPLACED and starts the FGS, and does not resurrect
 a monitor the user stopped), the FGS lifecycle
 (isRunning + startForeground notification; the runtime POST_NOTIFICATIONS
 permission is granted via UiAutomation since API 33 blocks notification
-posting without it), the liveness watchdog (restarts a dead service while
+posting without it; tapping the notification opens MainActivity — the
+background launch rides the SYSTEM_ALERT_WINDOW BAL exemption, the same one
+the lock-screen alert uses), the liveness watchdog (restarts a dead service while
 enabled; leaves a deliberately stopped one alone; never restarts a live one; a
 tick on a live service re-posts a cancelled notification; the manifest pins
 USE_EXACT_ALARM + SCHEDULE_EXACT_ALARM so recovery needs no user grant; the
@@ -130,7 +132,7 @@ app/src/main/res/              # layout, strings, colors, theme, icons
 app/src/main/res/layout/activity_about.xml  # About screen layout
 app/src/androidTest/kotlin/com/example/battwarn/
   BootReceiverTest.kt          # autostart contract (manifest + receiver behavior + stopped-monitor gate)
-  ServiceSmokeTest.kt          # FGS lifecycle + notification
+  ServiceSmokeTest.kt          # FGS lifecycle + notification + tap-opens-app
   MonitorWatchdogTest.kt       # liveness watchdog restarts a dead service while enabled
   MainActivityTest.kt          # main activity UI + add/load threshold rows + remove sound
   ImportExportTest.kt          # settings JSON dialog: show/copy/import/error
@@ -202,7 +204,9 @@ docs/                          # architecture, behavior, testing, screenshots
 - The foreground-service notification is refreshed on every battery change
   (in both IDLE and ACTIVE) so it always shows the current level. Its title
   flips monitoring → the active tier's name as the level crosses thresholds.
-  It doubles as the alert surface when the overlay permission isn't granted
+  Tapping it opens the app (the content intent launches MainActivity; the
+  ongoing notification stays). It doubles as the alert surface when the
+  overlay permission isn't granted
   (toasts are unreliable from the background on Android 10+ and entirely on 12+).
 - Monitoring self-heals; only a manual Stop tears it down. A foreground service
   can be killed and a sticky restart is not dependable (Android 12+ can refuse

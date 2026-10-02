@@ -100,8 +100,8 @@ background/text colors for the banner and the lock-screen alert.
 
 The interval is a quiet pause measured **after** the previous banner closes,
 whether it auto-dismissed or was tapped. If the overlay permission is absent,
-the notification remains available and the fallback cycle is scheduled from the
-previous alert start.
+the notification remains available (tapping it opens the app) and the fallback
+cycle is scheduled from the previous alert start.
 
 With **Show on lock screen** enabled for a threshold (default) and the overlay
 permission granted, an alert that fires while the device is locked and the
@@ -147,7 +147,7 @@ battery-restricted.
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 66 (plus 12 JVM unit tests)
+- Instrumented tests: 67 (plus 12 JVM unit tests)
 
 ## Documentation
 
