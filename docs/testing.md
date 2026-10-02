@@ -18,7 +18,8 @@ make install     # build and install
 make run         # install and launch
 make clean       # Gradle clean
 make avd-clean   # stop the emulator and delete the AVD "test"
-make clean-all   # Gradle clean + avd-clean
+make emulator-clean # uninstall app + test APK, stop emulator, delete AVD data
+make clean-all   # Gradle clean + emulator-clean
 make devices     # adb devices
 make avd         # create the API 35 AVD "test" if it does not exist
 make emulator    # boot AVD "test" if needed
@@ -33,7 +34,12 @@ The AVD is not committed; `make avd` (and `make emulator`, `make test-boot`,
 `make screenshots`) create it on demand via `scripts/ensure-avd.sh`
 (`system-images;android-35;google_apis_playstore;x86_64`, device `pixel_6`) and
 say so when they do. `make avd-clean` stops the emulator and deletes it again
-(`scripts/remove-avd.sh`; `make clean-all` also runs `clean`).
+(`scripts/remove-avd.sh`; `make clean-all` runs it together with Gradle `clean`
+through `emulator-clean`).
+`make emulator-clean` (`scripts/clean-emulator.sh`) additionally uninstalls the
+app and the instrumented test APK from a live emulator before stopping it, and
+removes any leftover AVD image/data directory; `make uninstall` uninstalls both
+`com.example.battwarn` and `com.example.battwarn.test`.
 `scripts/emulator-up.sh` starts the emulator if needed and
 `scripts/wait-for-boot.sh` waits (bounded) for boot; on failure the tail of
 `/tmp/battwarn-emulator.log` is printed. `make test-boot` reboots a reused

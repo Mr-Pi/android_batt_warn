@@ -48,7 +48,8 @@ make lint         # gradle lintDebug (Android Lint)
 make unit         # gradle testDebugUnitTest (JVM unit tests, no emulator)
 make clean        # gradle clean
 make avd-clean    # stop the emulator and delete the AVD "test"
-make clean-all    # gradle clean + avd-clean
+make emulator-clean # uninstall app + test APK, stop emulator, delete AVD data
+make clean-all    # gradle clean + emulator-clean
 make devices      # adb devices
 make avd          # create the API 35 AVD "test" if it does not exist
 make emulator     # boot headless API 35 emulator (AVD "test") if not running
@@ -63,7 +64,11 @@ The AVD is not committed (it lives in `$ANDROID_AVD_HOME` or
 (system image `system-images;android-35;google_apis_playstore;x86_64`, device
 `pixel_6`), printing a notice when they do. `make avd-clean` stops the emulator
 and deletes it again (`scripts/remove-avd.sh`), and `make clean-all` combines
-`clean` with `avd-clean`. `scripts/emulator-up.sh` starts the
+`clean` with `emulator-clean`. `make emulator-clean` (`scripts/clean-emulator.sh`)
+goes further: it uninstalls the app and the instrumented test APK from a live
+emulator first, then sweeps any leftover AVD image/data directory.
+`make uninstall` removes both `com.example.battwarn` and `com.example.battwarn.test`.
+`scripts/emulator-up.sh` starts the
 emulator if needed and waits (bounded) for boot; the emulator log is
 `/tmp/battwarn-emulator.log` and its tail is shown on any boot failure.
 `make test-boot` reboots a reused emulator (`REBOOT=1`) so battery/SystemUI
@@ -152,7 +157,8 @@ LICENSES/Apache-2.0.txt        # full Apache-2.0 text for the bundled libraries
 shell.nix                      # nix dev env (JDK, Gradle, Android SDK, emulator)
 Makefile                       # command wrappers
 scripts/                       # test-report.sh, screenshots.sh, ensure-avd.sh,
-                               # emulator-up.sh, wait-for-boot.sh
+                               # emulator-up.sh, wait-for-boot.sh, remove-avd.sh,
+                               # clean-emulator.sh
 README.md                      # project overview and quick start
 docs/                          # architecture, behavior, testing, screenshots
 ```

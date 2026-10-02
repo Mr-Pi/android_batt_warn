@@ -17,11 +17,11 @@ AVD_ENV     := AVD="$(AVD)" SYS_IMG="$(SYS_IMG)" DEVICE="$(DEVICE)"
 # gradle's exit status. Shared by `test` and `test-boot` so they stay in sync.
 RUN_TESTS   := gradle connectedDebugAndroidTest; status=$$?; bash scripts/test-report.sh; exit $$status
 
-.PHONY: help shell build release install run clean lint unit avd-clean clean-all uninstall devices avd emulator test test-boot screenshots
+.PHONY: help shell build release install run clean lint unit avd-clean emulator-clean clean-all uninstall devices avd emulator test test-boot screenshots
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 shell: ## Enter the nix-shell dev environment
 	nix-shell
@@ -50,10 +50,13 @@ unit: ## JVM unit tests (no emulator needed)
 avd-clean: ## Stop the emulator and delete the AVD "$(AVD)"
 	nix-shell --run '$(AVD_ENV) bash scripts/remove-avd.sh'
 
-clean-all: clean avd-clean ## Clean build outputs and delete the AVD
+emulator-clean: ## Uninstall app + test APK, stop emulator, delete AVD image data
+	nix-shell --run '$(AVD_ENV) PKG="$(PKG)" bash scripts/clean-emulator.sh'
 
-uninstall: ## Uninstall the app from device
-	nix-shell --run 'adb uninstall $(PKG)'
+clean-all: clean emulator-clean ## Clean build outputs and full emulator/AVD teardown
+
+uninstall: ## Uninstall the app and the instrumented test APK from device
+	nix-shell --run 'adb uninstall $(PKG).test >/dev/null 2>&1 && echo "removed $(PKG).test" || echo "$(PKG).test was not installed"; adb uninstall $(PKG)'
 
 devices: ## List connected Android devices
 	nix-shell --run 'adb devices'
