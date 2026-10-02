@@ -133,7 +133,9 @@ user interaction**:
   the latter is auto-granted on Android 13+, so recovery works out of the box
   even where Android 14+ no longer grants the exact-alarm right by default)
   fires about every 15 minutes while monitoring is enabled.
-- Each tick: if the service died, it is restarted. Holding a pending exact
+- Each tick re-arms its successor **before** acting on the service, so a tick
+  interrupted mid-restart cannot end the chain; if the service died, it is
+  restarted. Holding a pending exact
   alarm is an Android 12+ exemption from the background
   foreground-service-start restriction, so the restart is permitted. If the
   service is alive, the tick sends a refresh: the notification is re-posted
@@ -143,7 +145,14 @@ user interaction**:
   explicit Stop cancels it. A refused foreground promotion stops the service
   cleanly (Android enforces a promotion timeout regardless), and the
   alarm-exempt watchdog revives it within one tick — the user's monitoring
-  intent is preserved, so the notification always comes back.
+  intent is preserved, so the notification always comes back. Every successful
+  service start also re-arms the watchdog, and a refused exact arm falls back
+  to a slower inexact one instead of dying silently.
+- **Opening the app self-heals**: if monitoring is still enabled but the
+  service is dead (anything that cleared the pending alarm — a force-stop
+  by the user or an aggressive OEM policy is the only way), launching
+  MainActivity restarts the monitor and re-arms the watchdog automatically;
+  no Start press is needed. After a deliberate Stop it stays off.
 - The charging pause and unknown-level states keep a slow self-armed re-check
   running, so resuming never depends solely on plug/unplug broadcasts.
 
@@ -151,7 +160,8 @@ The Start flow also keeps requesting the battery-optimization exemption, and
 the main screen shows a warning while the app is still battery-restricted.
 Android force-stop is special: once force-stopped, Android will not run the
 boot receiver or any alarm until the app is manually opened — no app can
-survive that, by OS design.
+survive that, by OS design. Reopening the app now closes even that gap: it
+auto-resumes the enabled monitor and re-arms the watchdog.
 
 ## Battery usage
 

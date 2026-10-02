@@ -193,6 +193,11 @@ class BatteryMonitorService : Service() {
             return START_NOT_STICKY
         }
         registerReceivers()
+        // A live service must never be without a pending watchdog alarm: any
+        // start path (watchdog tick, boot, sticky restart, manual, save-restart
+        // race) re-arms the chain here. schedule() is idempotent and no-ops
+        // when the user stopped monitoring.
+        if (AppSettings.monitoringEnabled(this)) MonitorWatchdog.schedule(this)
 
         // Idempotent and self-repairing: a refresh tick for an already-running
         // service only re-posts the notification (above) and repairs the

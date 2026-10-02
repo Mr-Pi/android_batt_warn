@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.ParcelFileDescriptor
 import androidx.core.content.ContextCompat
+import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -36,6 +37,7 @@ class MonitorWatchdogTest {
     fun reset() {
         context.stopService(Intent(context, BatteryMonitorService::class.java))
         await(8_000L) { !BatteryMonitorService.isRunning }
+        MonitorWatchdog.lastArmedAtElapsedMs = -1
         grantNotificationPermission()
     }
 
@@ -171,6 +173,64 @@ class MonitorWatchdogTest {
             BatteryMonitorService.suppressedRecheckMs = 15 * 60_000L
             BatteryMonitorService.suppressedRechecks = 0
         }
+    }
+
+    @Test
+    fun scheduleRespectsTheMonitoringFlag() {
+        // Disabled: schedule is a no-op (never resurrects a deliberate Stop).
+        AppSettings.setMonitoringEnabled(context, false)
+        MonitorWatchdog.schedule(context)
+        assertTrue("disabled: watchdog must not arm", MonitorWatchdog.lastArmedAtElapsedMs < 0)
+
+        // Enabled: schedule arms a fresh pending alarm and records the stamp.
+        AppSettings.setMonitoringEnabled(context, true)
+        MonitorWatchdog.schedule(context)
+        assertTrue("enabled: watchdog must arm", MonitorWatchdog.lastArmedAtElapsedMs >= 0)
+    }
+
+    @Test
+    fun watchdogBroadcastReArmsThenRestartsTheDeadService() {
+        // End-to-end for the receiver's crash-proof ordering: it re-arms the
+        // next tick *before* acting, so a fresh alarm exists even if the
+        // restart itself is interrupted, and the dead service comes back.
+        AppSettings.setMonitoringEnabled(context, true)
+        assertFalse("precondition: service not running", BatteryMonitorService.isRunning)
+
+        context.sendBroadcast(
+            Intent(context, WatchdogReceiver::class.java)
+                .setAction(WatchdogReceiver.ACTION_WATCHDOG)
+        )
+        assertTrue("tick must re-arm the watchdog", await(10_000) { MonitorWatchdog.lastArmedAtElapsedMs >= 0 })
+        assertTrue("service did not come back", await(10_000) { BatteryMonitorService.isRunning })
+    }
+
+    @Test
+    fun launchResumesEnabledMonitoring() {
+        // The system killed the service but the user still wants monitoring:
+        // simply opening the app must restart it and re-arm the watchdog.
+        AppSettings.setMonitoringEnabled(context, true)
+        assertFalse("precondition: service dead", BatteryMonitorService.isRunning)
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            assertTrue(
+                "opening the app must resume monitoring",
+                await(10_000) { BatteryMonitorService.isRunning }
+            )
+        }
+        assertTrue("launch must re-arm the watchdog", MonitorWatchdog.lastArmedAtElapsedMs >= 0)
+    }
+
+    @Test
+    fun launchStaysStoppedWhenDisabled() {
+        // A deliberate Stop is recorded in the flag; opening the app must not
+        // undo it (no restart, no re-arm).
+        AppSettings.setMonitoringEnabled(context, false)
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            Thread.sleep(1_000)
+            assertFalse("deliberate Stop must not be undone", BatteryMonitorService.isRunning)
+        }
+        assertTrue("disabled: launch must not arm the watchdog", MonitorWatchdog.lastArmedAtElapsedMs < 0)
     }
 
     private fun notificationFor(nm: NotificationManager): Notification? =

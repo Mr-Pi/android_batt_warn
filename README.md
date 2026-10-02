@@ -134,10 +134,12 @@ and repairs a lost alert cadence, so a low-battery night cannot go silently
 unwatched. `USE_EXACT_ALARM` is declared so the exact-alarm right is
 auto-granted on Android 13+ (Android 14+ no longer grants the ordinary exact
 permission by default). An explicit **Stop** cancels the watchdog, and it never
-resurrects a monitor the user stopped. The Start flow also asks for the
+resurrects a monitor the user stopped. The watchdog re-arms before it acts, a
+live service always keeps a fresh alarm, and **opening the app self-heals an
+enabled-but-dead monitor** — so even a force-stop-style kill is repaired on the
+next app launch without pressing Start. The Start flow also asks for the
 battery-optimization exemption; the main screen warns while the app is still
-battery-restricted. (A user force-stop is the one thing no app survives — the
-OS blocks every restart path until the app is opened again.)
+battery-restricted.
 
 ## Project status
 
@@ -145,7 +147,7 @@ OS blocks every restart path until the app is opened again.)
 - Target/compile SDK: 35
 - Gradle: 8.14.4
 - JDK: 17
-- Instrumented tests: 62 (plus 12 JVM unit tests)
+- Instrumented tests: 66 (plus 12 JVM unit tests)
 
 ## Documentation
 

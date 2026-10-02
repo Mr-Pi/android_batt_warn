@@ -33,7 +33,11 @@ import androidx.core.content.ContextCompat
  * on, so it costs one wake-up every fifteen minutes at most and never during
  * an explicit Stop.
  *
- * Scheduled on Start/boot and re-armed by each receipt; cancelled on Stop.
+ * Scheduled on Start/boot and re-armed by each receipt *before* the receipt
+ * acts on the service, so a tick that dies mid-action cannot end the chain; an
+ * exact-arm refusal falls back to the inexact arm for the same reason. Cancelled
+ * on Stop. Also re-armed by every successful service start while the user wants
+ * monitoring, so a live service can never run without a pending watchdog alarm.
  */
 object MonitorWatchdog {
 
@@ -43,32 +47,53 @@ object MonitorWatchdog {
     private const val TAG = "BattWarn"
     private const val REQUEST_CODE = 0x8A7
 
+    /**
+     * [SystemClock.elapsedRealtime] of the most recent successful arm
+     * (-1 when never armed). Test hook proving a code path really re-armed the
+     * watchdog, since no public API queries pending alarms from the app.
+     */
+    @Volatile
+    internal var lastArmedAtElapsedMs = -1L
+
     /** Arms the next check. Call when the user wants monitoring on. */
     fun schedule(context: Context) {
         if (!AppSettings.monitoringEnabled(context)) return
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
         val triggerAt = SystemClock.elapsedRealtime() + WATCHDOG_INTERVAL_MS
+        val alarm = pendingIntent(context)
         try {
             if (canScheduleExact(alarmManager)) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
                     triggerAt,
-                    pendingIntent(context)
+                    alarm
                 )
             } else {
-                // Without the exact-alarm grant the OS batches this, but it can
-                // still fire in doze maintenance windows — a slower but valid
-                // backstop rather than no watchdog at all.
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    triggerAt,
-                    pendingIntent(context)
-                )
+                armInexact(alarmManager, triggerAt, alarm)
             }
-            Log.i(TAG, "watchdog armed for ${WATCHDOG_INTERVAL_MS / 1000}s")
         } catch (e: SecurityException) {
-            Log.w(TAG, "watchdog could not be armed: $e")
+            // The exact-alarm right can vanish between the check and the call
+            // (revocation, OEM refusal). Never let the chain die silently:
+            // fall back to the slower but always-permitted inexact arm.
+            Log.w(TAG, "exact watchdog arm refused ($e) — arming inexact instead")
+            try {
+                armInexact(alarmManager, triggerAt, alarm)
+            } catch (e2: Exception) {
+                Log.w(TAG, "watchdog could not be armed at all: $e2")
+                return
+            }
         }
+        lastArmedAtElapsedMs = SystemClock.elapsedRealtime()
+        Log.i(TAG, "watchdog armed for ${WATCHDOG_INTERVAL_MS / 1000}s")
+    }
+
+    /**
+     * Without the exact-alarm grant the OS batches this, but it can still fire
+     * in doze maintenance windows — a slower but valid backstop rather than no
+     * watchdog at all.
+     */
+    private fun armInexact(alarmManager: AlarmManager, triggerAt: Long, alarm: PendingIntent) {
+        alarmManager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, alarm)
     }
 
     /** Disarms the check. Call when the user explicitly stops monitoring. */

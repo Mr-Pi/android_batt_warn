@@ -85,7 +85,10 @@ posting without it), the liveness watchdog (restarts a dead service while
 enabled; leaves a deliberately stopped one alone; never restarts a live one; a
 tick on a live service re-posts a cancelled notification; the manifest pins
 USE_EXACT_ALARM + SCHEDULE_EXACT_ALARM so recovery needs no user grant; the
-charging pause keeps re-arming its bounded re-check),
+charging pause keeps re-arming its bounded re-check; a real watchdog broadcast
+re-arms the next tick *before* restarting; `schedule()` honors the monitoring
+flag; launching MainActivity self-heals an enabled-but-dead monitor and stays
+stopped after a deliberate Stop),
 threshold detection (battery dropped below the highest
 threshold flips the notification to the active tier's name), the overlay
 banner (SYSTEM_ALERT_WINDOW), multi-threshold selection (warning vs critical
@@ -110,7 +113,7 @@ app/src/main/kotlin/com/example/battwarn/
   MainActivity.kt              # live battery %, Start/Stop, threshold-list settings + import/export
   BatteryMonitorService.kt     # foreground service: IDLE/ACTIVE state machine, active-tier selection
   MonitorWatchdog.kt           # liveness watchdog: exact alarm + restart decision
-  WatchdogReceiver.kt          # watchdog alarm receiver (restarts the service if dead)
+  WatchdogReceiver.kt          # watchdog alarm receiver (re-arms first, then restarts/refreshes)
   BootReceiver.kt              # auto-start on BOOT_COMPLETED / MY_PACKAGE_REPLACED
   AppSettings.kt               # config settings (SharedPreferences) + defaults
   AlertThreshold.kt            # tier data class, JSON codec, selection helpers, color palette
@@ -200,18 +203,25 @@ docs/                          # architecture, behavior, testing, screenshots
   can be killed and a sticky restart is not dependable (Android 12+ can refuse
   the foreground promotion after a restart). `MonitorWatchdog` arms an
   `AlarmManager` exact alarm about every 15 minutes while monitoring is enabled;
-  `WatchdogReceiver` then runs one tick: dead service → restart; live service →
+  `WatchdogReceiver` then runs one tick: it re-arms the next alarm *first*
+  (a tick interrupted mid-action cannot end the chain; a refused exact arm
+  falls back to inexact), then dead service → restart; live service →
   send `ACTION_REFRESH`, which re-posts the notification from the sticky battery
   (bounded staleness) and repairs a lost cadence. `USE_EXACT_ALARM` is declared
   so the exact-alarm right is auto-granted on Android 13+ (on 14+
   `SCHEDULE_EXACT_ALARM` alone is *not* — without the exact grant the restart is
   not exempt from the background-FGS-start restriction and recovery fails
   forever). Holding a pending exact alarm is that exemption. `onDestroy` re-arms
-  the watchdog; an explicit Stop cancels it. A persisted `monitoringEnabled`
+  the watchdog and so does every successful `onStartCommand` while enabled (a
+  live service is never without a pending alarm); an explicit Stop cancels it.
+  A persisted `monitoringEnabled`
   flag records the user's intent, so boot and the watchdog never resurrect a
   monitor the user stopped. A refused `startForeground` stops the service
   cleanly (the platform enforces a promotion timeout) and the alarm-exempt
-  watchdog revives it within one tick.
+  watchdog revives it within one tick. Opening MainActivity with the flag
+  enabled but the service dead restarts monitoring and re-arms the watchdog
+  automatically (the repair path after a force-stop-style kill cleared the
+  alarm).
 - While ACTIVE, a lost dismissal cannot dead-end the cycle (the pending poll is
   tracked separately and re-armed; a duration+interval safety net is armed
   *before* the banner shows and the dismissal callback replaces it), and one

@@ -8,7 +8,7 @@
 | `BatteryMonitorService` | Foreground service, battery/power/screen receivers, active-tier selection, notification and alert scheduling, doze backstop |
 | `BootReceiver` | Starts the foreground service for `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` when monitoring is enabled |
 | `MonitorWatchdog` | Liveness watchdog: schedules the exact alarm and restarts the service when it has died while enabled |
-| `WatchdogReceiver` | Receives the watchdog alarm, restarts if needed, and re-arms the next tick |
+| `WatchdogReceiver` | Receives the watchdog alarm, re-arms the next tick *first*, then restarts or refreshes the service |
 | `AppSettings` | SharedPreferences keys, defaults, threshold-list persistence, monitoring flag, and settings accessors |
 | `AlertThreshold` | Data class for one tier (level, name, timings, sound, flags, colors), JSON codec, and pure selection helpers |
 | `OverlayAlert` | Bottom `TYPE_APPLICATION_OVERLAY` banner with auto/tap dismissal, tinted per threshold |
@@ -49,7 +49,10 @@ else revives it. `MonitorWatchdog` is the safety net — an `AlarmManager` exact
 alarm re-armed every ~15 minutes while monitoring is enabled, declared with
 `USE_EXACT_ALARM` (+ `SCHEDULE_EXACT_ALARM` for API 31/32) so the exact-alarm
 right is auto-granted on Android 13+ and recovery needs no user interaction.
-`WatchdogReceiver` runs one tick:
+`WatchdogReceiver` runs one tick — it **re-arms the next alarm first, then
+acts**, so a tick whose restart action is interrupted (process death, crash in
+the freshly started service) still leaves a fresh pending alarm instead of
+silently ending the chain:
 
 - service gone + enabled → restart it (holding a pending exact alarm is an
   Android 12+ exemption from the background foreground-service-start
@@ -57,6 +60,14 @@ right is auto-granted on Android 13+ and recovery needs no user interaction.
 - service alive → send `ACTION_REFRESH`: `BatteryMonitorService` re-posts the
   notification from the sticky battery (bounded staleness even with every
   broadcast lost) and repairs the cadence if no poll is pending.
+
+Two more arms keep the chain unbroken: every successful service start re-arms
+the watchdog while enabled (`onStartCommand`, `onDestroy`), so a live service
+is never without a pending alarm, and a refused exact-arm falls back to the
+slower inexact arm instead of dying silently (`SecurityException`). Opening
+MainActivity with monitoring enabled but the service dead also restarts it and
+re-arms the watchdog — this is the repair path after anything that cleared the
+pending alarm (a force-stop-style kill is the only one left).
 
 `onDestroy` re-arms the watchdog so an unexpected death self-heals; an explicit
 Stop cancels it. A refused `startForeground()` inside the service stops it

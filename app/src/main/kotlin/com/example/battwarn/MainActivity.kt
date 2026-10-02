@@ -41,6 +41,9 @@ import com.example.battwarn.databinding.ItemThresholdBinding
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
+/** How long the monitor controls keep repainting after a self-heal start. */
+private const val MONITOR_UI_WAIT_MS = 5_000L
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -123,6 +126,7 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermissionIfNeeded()
         loadSettingsIntoFields()
         refreshBattery()
+        resumeMonitoringIfNeeded()
     }
 
     override fun onStart() {
@@ -165,6 +169,37 @@ class MainActivity : AppCompatActivity() {
         } else {
             getString(R.string.status_stopped)
         }
+    }
+
+    /**
+     * Self-heal for "the system killed the service while monitoring was still
+     * wanted": opening the app is a foreground interaction — always exempt
+     * from the background FGS-start restriction — so resume the monitor and
+     * re-arm the watchdog (a force-stop-style kill clears pending alarms, and
+     * until now nothing ever re-armed them short of pressing Start again).
+     * After a deliberate Stop the flag is false and this does nothing.
+     */
+    @VisibleForTesting
+    internal fun resumeMonitoringIfNeeded() {
+        if (!AppSettings.monitoringEnabled(this)) return
+        MonitorWatchdog.schedule(this)
+        if (BatteryMonitorService.isRunning) return
+        MonitorWatchdog.ensureMonitoring(this)
+        // Promotion happens asynchronously; repaint the controls once it lands.
+        awaitMonitorUi(android.os.SystemClock.elapsedRealtime() + MONITOR_UI_WAIT_MS)
+    }
+
+    /** Repaints the monitor controls until the service reports running. */
+    private fun awaitMonitorUi(deadline: Long) {
+        binding.root.postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            refreshMonitorControls()
+            if (!BatteryMonitorService.isRunning &&
+                android.os.SystemClock.elapsedRealtime() < deadline
+            ) {
+                awaitMonitorUi(deadline)
+            }
+        }, 400L)
     }
 
     private fun toggleMonitoring() {
